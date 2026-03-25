@@ -74,31 +74,32 @@ class SolventEnergy(EnergyTerm):
         if n < 2:
             return 0.0
 
-        ca = get_ca_coords(coords)
+        ca = get_ca_coords(coords)  # (N, 3)
         tunnel_positions = kwargs.get('tunnel_positions')
+        tunnel_length = kwargs.get('tunnel_length', 90.0)
 
-        energy = 0.0
-        for i in range(n):
-            # Skip residues inside the tunnel (no solvent contact)
-            if tunnel_positions is not None:
-                tunnel_length = kwargs.get('tunnel_length', 90.0)
-                if tunnel_positions[i] <= tunnel_length:
-                    continue
+        # Determine which residues are exposed to solvent
+        if tunnel_positions is not None:
+            exposed_mask = tunnel_positions > tunnel_length
+        else:
+            exposed_mask = np.ones(n, dtype=bool)
 
-            # Count neighbors within cutoff (burial proxy)
-            n_neighbors = 0
-            for j in range(n):
-                if i == j:
-                    continue
-                dist = np.linalg.norm(ca[i] - ca[j])
-                if dist < BURIAL_CUTOFF:
-                    n_neighbors += 1
+        if not np.any(exposed_mask):
+            return 0.0
 
-            # Exposure fraction: 1 = fully exposed, 0 = fully buried
-            exposure = max(0.0, 1.0 - n_neighbors / MAX_NEIGHBORS)
+        # Pairwise CA distance matrix
+        diff = ca[:, None, :] - ca[None, :, :]  # (N, N, 3)
+        dist = np.linalg.norm(diff, axis=2)      # (N, N)
+        np.fill_diagonal(dist, BURIAL_CUTOFF + 1)  # Exclude self
 
-            # Solvation cost
-            sigma = SOLVATION_PARAMS.get(sequence[i], 0.0)
-            energy += sigma * exposure
+        # Count neighbors within cutoff for each residue
+        neighbor_counts = np.sum(dist < BURIAL_CUTOFF, axis=1)  # (N,)
 
-        return energy
+        # Exposure fraction
+        exposure = np.maximum(0.0, 1.0 - neighbor_counts / MAX_NEIGHBORS)
+
+        # Solvation parameters for each residue
+        sigma = np.array([SOLVATION_PARAMS.get(aa, 0.0) for aa in sequence])
+
+        # Only count exposed-to-solvent residues
+        return float(np.sum(sigma[exposed_mask] * exposure[exposed_mask]))

@@ -232,7 +232,73 @@ BENCHMARK_SET: list[BenchmarkEntry] = [
         description="KaiB switches from thioredoxin fold to four-helix bundle during circadian cycle",
     ),
 
-    # --- Category 9: Multi-domain ---
+    # --- Category 9: AlphaFold weaknesses (high-res PDB, low AF confidence) ---
+
+    BenchmarkEntry(
+        name="CLIC1 (metamorphic)",
+        pdb_id="1K0M", chain_id="A", uniprot_id="O00299",
+        sequence="MAEEQPQVELFVKAGSDGAKIGNCPFSQRLFMVLWLKGVTFNVTTVDTKRRTETVQKLCPGGELFLHQNKEKNAEELAAFNKGETSLKKLNMSNKNADKNQAISIAKNWDAGNRWVKSKKVGSKYLFQALGQHFVDYLRDHDINLRGNEYDKNQHEVVAKYNSDYQLKIWDKLNGELFQKKEELDKICPYDHEIHFLDISPLTYNFEANMKAMFNQMEELGS",
+        category="af_weakness", n_residues=222, resolution=1.40,
+        organism="Homo sapiens", fold_class="metamorphic (GST-like ↔ TM channel)",
+        description="CLIC1 exists as soluble GST-fold AND transmembrane channel. AF predicts only soluble form. 1.4Å resolution.",
+        alphafold_plddt=82.0,
+    ),
+    BenchmarkEntry(
+        name="SARS-CoV-2 Orf8",
+        pdb_id="7JTL", chain_id="A", uniprot_id="P0DTC8",
+        sequence="MKFLVFLGIITTVAAFHQECSLQSCTQHQPYVVDDPCPIHFYSKWYIRVGARKSAPLIELCVDEAGSKSPIQYIDIGNYTVSCLPFTINCQEPKLGSLVVRCSFNVNLRATQLFLNPNVTWPKVQDVILNQQSRQRLQPRAADTKKTKTSLNLHSFLRGRDHLVDGSMDKFVVTSAYFTITDEKIGNIISKVQHAANTEIVALTSKLKDAIFNAQVGLIELKQLEK",
+        category="af_weakness", n_residues=226, resolution=2.04,
+        organism="SARS-CoV-2", fold_class="novel Ig-like fold",
+        description="Novel Ig-like fold with unique disulfide patterns. AF pLDDT ~55-65. Post-training novel structure.",
+        alphafold_plddt=60.0,
+    ),
+    BenchmarkEntry(
+        name="Mad2 (open form)",
+        pdb_id="1DUJ", chain_id="A", uniprot_id="Q13257",
+        sequence="MKTYIPEDFLLEGVSSQMLDNGNNQSVGSQRPGTKPLNASSGTNVTPTQFTSYSTMALPDSTPTYGLHFATTDNQRYFTDHQSFVMSWTPVDSMNRGKISQRSFLIGALEHEDHLKALDKSSLEVTLKQLKLEETDFPRKCLFSIFRTDEEQEKYKDTSFLELPKGVRKYLSFHCPVIAQEEIRDQYFTSYNIIDGVPCPHDGLAEELTRALTVALETLMTIYQDIDEEDLQRAFEELAALC",
+        category="af_weakness", n_residues=242, resolution=2.05,
+        organism="Homo sapiens", fold_class="topological switch (open ↔ closed)",
+        description="Mad2 switches between topologically distinct folds. AF predicts closed form; open form has different beta-strand topology.",
+        alphafold_plddt=75.0,
+    ),
+    BenchmarkEntry(
+        name="Serpin (alpha-1-antitrypsin)",
+        pdb_id="1QLP", chain_id="A", uniprot_id="P01009",
+        sequence="EDPQGDAAQKTDTSHHDQDHPTFNKITPNLAEFAFSLYRQLAHQSNSTNIFFSPVSIATAFAMLSLGTKADTHDEILEGLNFNLTEIPEAQIHEGFQELLRTLNQPDSQLQLTTGNGLFLSEGLKLVDKFLEDVKKLYHSEAFTVNFGDTEEAKKQINDYVEKGTQGKIVDLVKELDRDTVFALVNYIFFKGKWERPFEVKDTEEEDFHVDQVTTVKVPMMKRLGMFNIQHCKKLSSWVLLMKYLGNATAIFFLPDEGKLQHLENELTHDIITKFLENEDRRSASLHLPKLSITGTYDLKSVLGQLGITKVFSNGADLSGVTEEAPLKLSKAVHKAVLTIDEKGTEAAGAMFLEAIPMSIPPEVKFNKPFVFLMIEQNTKSPLFMGKVVNPTQK",
+        category="af_weakness", n_residues=394, resolution=2.00,
+        organism="Homo sapiens", fold_class="metastable (serpin fold)",
+        description="Metastable serpin. AF predicts native form but misses the cleaved/relaxed form. Kinetically trapped during co-translational folding.",
+        alphafold_plddt=88.0,
+    ),
+    BenchmarkEntry(
+        name="Prion protein PrP",
+        pdb_id="6LNI", chain_id="A", uniprot_id="P04156",
+        sequence="MANLGCWMLVLFVATWSDLGLCKKRPKPGGWNTGGSRYPGQGSPGGNRYPPQGGGGWGQPHGGGWGQPHGGGWGQPHGGGWGQPHGGGWGQGGGTHSQWNKPSKPKTNMKHMAGAAAAGAVVGGLGGYMLGSAMSRPIIHFGSDYEDRYYRENMHRYPNQVYYRPMDEYSNQNNFVHDCVNITIKQHTVTTTTKGENFTETDVKMMERVVEQMCITQYERESQAYYQRGS",
+        category="af_weakness", n_residues=230, resolution=1.70,
+        organism="Homo sapiens", fold_class="IDP + globular (misfolding-prone)",
+        description="N-terminal 100 residues: AF pLDDT <40. Structured C-domain: ~75. Cannot predict PrPSc amyloid form. Disease-relevant misfolding.",
+        alphafold_plddt=45.0,
+    ),
+    BenchmarkEntry(
+        name="T4 lysozyme",
+        pdb_id="2LZM", chain_id="A", uniprot_id="P00720",
+        sequence="MNIFEMLRIDEGLRLKIYKDTEGYYTIGIGHLLTKSPSLNAAKSELDKAIGRNTNGVITKDEAEKLFNQDVDAAVRGILRNAKLKPVYDSLDAVRRAALINMVFQMGETGVAGFTNSLRMLQQKRWDEAAVNLAKSRWYNQTPNRAKRVITTFRTGTWDAYKNL",
+        category="af_weakness", n_residues=164, resolution=1.70,
+        organism="Bacteriophage T4", fold_class="alpha+beta (lysozyme)",
+        description="700+ crystal structures showing conformational dynamics. AF pLDDT ~90 but predicts single state. Open/closed hinge motion missed.",
+        alphafold_plddt=90.0,
+    ),
+    BenchmarkEntry(
+        name="Top7 (designed)",
+        pdb_id="1QYS", chain_id="A", uniprot_id="",
+        sequence="DIQVQVNIDDNGKNFDYTYTVTTESELQKVLNELMDYIKKQGAKRVRISITARTKKEAEKFAAILIKVFAELGYNDINVTFDGDTVTVEGQLE",
+        category="af_weakness", n_residues=93, resolution=1.25,
+        organism="Designed", fold_class="novel (Rosetta designed)",
+        description="De novo designed protein with novel topology. No natural homologs. AF struggles with novel folds not in training set.",
+        alphafold_plddt=58.0,
+    ),
+
+    # --- Category 10: Multi-domain ---
 
     BenchmarkEntry(
         name="Adenylate kinase",

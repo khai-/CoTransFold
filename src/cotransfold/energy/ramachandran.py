@@ -135,10 +135,22 @@ class RamachandranEnergy(EnergyTerm):
         if n == 0:
             return 0.0
 
-        energy = 0.0
+        # Group residues by Ramachandran class for batch computation
+        phi = backbone.phi
+        psi = backbone.psi
+
+        # Precompute all probabilities
+        probs = np.empty(n)
         for i in range(n):
             next_aa = sequence[i + 1] if i + 1 < n else None
-            p = rama_probability(backbone.phi[i], backbone.psi[i],
-                                 sequence[i], next_aa)
-            energy += -self._kT * np.log(p)
-        return energy
+            regions = _get_regions(sequence[i], next_aa)
+            p = 0.0
+            for weight, mu_phi, mu_psi, sigma_phi, sigma_psi in regions:
+                dphi = phi[i] - mu_phi
+                dphi = dphi - 2 * np.pi * np.round(dphi / (2 * np.pi))
+                dpsi = psi[i] - mu_psi
+                dpsi = dpsi - 2 * np.pi * np.round(dpsi / (2 * np.pi))
+                p += weight * np.exp(-0.5 * ((dphi / sigma_phi) ** 2 + (dpsi / sigma_psi) ** 2))
+            probs[i] = max(p, 1e-10)
+
+        return float(-self._kT * np.sum(np.log(probs)))

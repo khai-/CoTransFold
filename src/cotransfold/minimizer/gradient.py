@@ -1,10 +1,10 @@
-"""L-BFGS-B energy minimizer operating on torsion angles.
+"""L-BFGS-B energy minimizer operating on torsion angles (optimized).
 
 Minimizes total energy by adjusting phi/psi angles of free residues.
 Uses scipy's L-BFGS-B optimizer with:
 - Ramachandran-derived bounds on phi/psi
 - Frozen residue masking (tunnel constraints)
-- Numerical gradients via central finite differences
+- Vectorized numerical gradients
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ class MinimizationResult:
     message: str
 
 
-# Default phi/psi bounds (generous Ramachandran)
+# Default phi/psi bounds
 PHI_BOUNDS = (-np.pi, np.pi)
 PSI_BOUNDS = (-np.pi, np.pi)
 
@@ -41,13 +41,6 @@ class GradientMinimizer:
                  gradient_step: float = 1e-4,
                  ftol: float = 1e-6,
                  gtol: float = 1e-4) -> None:
-        """
-        Args:
-            max_iterations: maximum L-BFGS-B iterations
-            gradient_step: step size for numerical gradient (radians)
-            ftol: function tolerance for convergence
-            gtol: gradient tolerance for convergence
-        """
         self.max_iterations = max_iterations
         self.gradient_step = gradient_step
         self.ftol = ftol
@@ -59,26 +52,12 @@ class GradientMinimizer:
                  frozen_mask: np.ndarray | None = None,
                  max_iterations: int | None = None,
                  **energy_kwargs) -> MinimizationResult:
-        """Minimize energy by adjusting phi/psi of free residues.
-
-        Args:
-            chain: the nascent chain (modified in-place)
-            energy_fn: total energy function
-            frozen_mask: per-residue mask (0=frozen, 0.5=restricted, 1=free).
-                        If None, all residues are free.
-            max_iterations: override default max iterations
-            **energy_kwargs: passed to energy_fn.compute()
-
-        Returns:
-            MinimizationResult with before/after energies
-        """
         n = chain.chain_length
         if n == 0:
             return MinimizationResult(0.0, 0.0, 0, True, "empty chain")
 
         max_iter = max_iterations or self.max_iterations
 
-        # Identify which variables are free
         if frozen_mask is None:
             frozen_mask = np.ones(n)
 
@@ -87,49 +66,49 @@ class GradientMinimizer:
             e = energy_fn.compute(chain, **energy_kwargs)
             return MinimizationResult(e, e, 0, True, "no free variables")
 
-        # Build variable vector (only free phi/psi)
-        # Map: var_idx -> (residue_idx, angle_type)
-        # angle_type: 0=phi, 1=psi
-        var_map = []
-        for ri in free_indices:
-            var_map.append((ri, 0))  # phi
-            var_map.append((ri, 1))  # psi
-        n_vars = len(var_map)
+        # Build index arrays for fast variable get/set
+        # Variables are [phi_0, psi_0, phi_1, psi_1, ...] for free residues
+        n_free = len(free_indices)
+        n_vars = 2 * n_free
+        phi_slots = free_indices  # Which backbone.phi entries to optimize
+        psi_slots = free_indices  # Which backbone.psi entries to optimize
 
         def _get_vars() -> np.ndarray:
-            x = np.zeros(n_vars)
-            for vi, (ri, at) in enumerate(var_map):
-                x[vi] = chain.backbone.phi[ri] if at == 0 else chain.backbone.psi[ri]
+            x = np.empty(n_vars)
+            x[0::2] = chain.backbone.phi[phi_slots]
+            x[1::2] = chain.backbone.psi[psi_slots]
             return x
 
         def _set_vars(x: np.ndarray) -> None:
-            for vi, (ri, at) in enumerate(var_map):
-                if at == 0:
-                    chain.backbone.phi[ri] = x[vi]
-                else:
-                    chain.backbone.psi[ri] = x[vi]
+            chain.backbone.phi[phi_slots] = x[0::2]
+            chain.backbone.psi[psi_slots] = x[1::2]
 
         def _objective(x: np.ndarray) -> float:
             _set_vars(x)
             return energy_fn.compute(chain, **energy_kwargs)
 
         def _gradient(x: np.ndarray) -> np.ndarray:
-            grad = np.zeros(n_vars)
+            """Compute gradient using forward finite differences (faster than central)."""
             h = self.gradient_step
             e0 = _objective(x)
+            grad = np.zeros(n_vars)
+
+            # Forward finite differences: 1 eval per variable instead of 2
             for i in range(n_vars):
-                x_plus = x.copy()
-                x_plus[i] += h
-                x_minus = x.copy()
-                x_minus[i] -= h
-                grad[i] = (_objective(x_plus) - _objective(x_minus)) / (2 * h)
-            _set_vars(x)  # Restore
+                x[i] += h
+                _set_vars(x)
+                e_plus = energy_fn.compute(chain, **energy_kwargs)
+                grad[i] = (e_plus - e0) / h
+                x[i] -= h  # Restore
+
+            _set_vars(x)  # Restore original
             return grad
 
         # Set up bounds
         bounds = []
-        for ri, at in var_map:
-            bounds.append(PHI_BOUNDS if at == 0 else PSI_BOUNDS)
+        for _ in range(n_free):
+            bounds.append(PHI_BOUNDS)
+            bounds.append(PSI_BOUNDS)
 
         x0 = _get_vars()
         energy_before = _objective(x0)

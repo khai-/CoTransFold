@@ -64,6 +64,7 @@ class SimulationConfig:
     tunnel_elec_weight: float = 1.0
 
     # Minimizer parameters
+    minimizer: str = 'numpy'            # 'jax' (autodiff) or 'numpy' (finite differences)
     minimizer_ftol: float = 1e-5
     minimizer_gtol: float = 1e-3
     minimizer_gradient_step: float = 1e-4
@@ -119,6 +120,22 @@ class SimulationEngine:
             self._chaperone_program = ChaperoneProgram(cfg.organism)
 
         # Minimizer
+        self._use_jax = cfg.minimizer == 'jax'
+        if self._use_jax:
+            from cotransfold.minimizer.jax_minimizer import JaxMinimizer
+            self._jax_minimizer = JaxMinimizer(
+                max_iterations=cfg.max_steps_per_residue,
+                ftol=cfg.minimizer_ftol,
+                gtol=cfg.minimizer_gtol,
+            )
+            self._jax_weights = {
+                'ramachandran': cfg.w_ramachandran,
+                'hbond': cfg.w_hbond,
+                'vanderwaals': cfg.w_vanderwaals,
+                'bonded': cfg.w_bonded,
+                'solvent': cfg.w_solvent if cfg.use_solvent else 0.0,
+                'tunnel': cfg.w_tunnel if cfg.use_tunnel else 0.0,
+            }
         self._minimizer = GradientMinimizer(
             max_iterations=cfg.max_steps_per_residue,
             gradient_step=cfg.minimizer_gradient_step,
@@ -213,12 +230,24 @@ class SimulationEngine:
                 energy_kwargs['tunnel_positions'] = chain.tunnel_position
                 energy_kwargs['tunnel_length'] = tunnel_length
 
-            result = self._minimizer.minimize(
-                chain, self._energy,
-                frozen_mask=frozen_mask,
-                max_iterations=n_steps,
-                **energy_kwargs,
-            )
+            if self._use_jax:
+                jax_kwargs = dict(energy_kwargs)
+                jax_kwargs.pop('tunnel_length', None)
+                result = self._jax_minimizer.minimize(
+                    chain, None,
+                    frozen_mask=frozen_mask,
+                    max_iterations=n_steps,
+                    weights=self._jax_weights,
+                    tunnel_length=tunnel_length,
+                    **jax_kwargs,
+                )
+            else:
+                result = self._minimizer.minimize(
+                    chain, self._energy,
+                    frozen_mask=frozen_mask,
+                    max_iterations=n_steps,
+                    **energy_kwargs,
+                )
 
             # 7. Compute final energy decomposition
             energy_decomposed = self._energy.compute_decomposed(chain, **energy_kwargs)

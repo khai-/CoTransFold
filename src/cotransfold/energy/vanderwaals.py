@@ -1,16 +1,9 @@
-"""Van der Waals / steric repulsion energy.
-
-Uses a soft repulsive potential between backbone atoms to prevent
-steric clashes. For the backbone-only MVP, we use CA-CA distances
-with a modified Lennard-Jones repulsive term.
+"""Van der Waals / steric repulsion energy (vectorized).
 
 E_vdw = sum_{i<j, |i-j|>2} epsilon * (sigma/r_ij)^12
 
-Only the repulsive r^-12 term is used (no attractive r^-6),
-since backbone-only representation lacks the detail for
-accurate van der Waals attractions.
-
-Excluded: residue pairs within 2 positions in sequence (bonded neighbors).
+Only the repulsive r^-12 term is used (no attractive r^-6).
+Excluded: residue pairs within 2 positions in sequence.
 """
 
 from __future__ import annotations
@@ -32,17 +25,9 @@ BACKBONE_EPSILON = 0.10  # kcal/mol
 
 
 class VanDerWaalsEnergy(EnergyTerm):
-    """Steric repulsion between backbone atoms.
-
-    Uses CA-based coarse model for speed, with optional all-backbone-atom mode.
-    """
+    """Steric repulsion between backbone atoms (vectorized)."""
 
     def __init__(self, use_all_atoms: bool = False) -> None:
-        """
-        Args:
-            use_all_atoms: if True, compute repulsion between all N/CA/C atoms.
-                          if False (default), use only CA-CA pairs.
-        """
         self._use_all_atoms = use_all_atoms
 
     @property
@@ -61,34 +46,42 @@ class VanDerWaalsEnergy(EnergyTerm):
             return self._compute_ca_only(coords, n)
 
     def _compute_ca_only(self, coords: np.ndarray, n: int) -> float:
-        """CA-CA repulsive potential."""
-        ca = get_ca_coords(coords)  # shape (N, 3)
-        energy = 0.0
+        """CA-CA repulsive potential (vectorized)."""
+        ca = get_ca_coords(coords)  # (N, 3)
 
-        for i in range(n):
-            for j in range(i + MIN_SEQ_SEP, n):
-                r = np.linalg.norm(ca[j] - ca[i])
-                if r < CA_SIGMA:
-                    # Soft repulsion: epsilon * (sigma/r)^12
-                    ratio = CA_SIGMA / max(r, 0.1)
-                    energy += CA_EPSILON * ratio ** 12
-        return energy
+        # Pairwise distance matrix
+        diff = ca[:, None, :] - ca[None, :, :]  # (N, N, 3)
+        dist = np.linalg.norm(diff, axis=2)      # (N, N)
+
+        # Upper triangle mask with sequence separation
+        ii, jj = np.meshgrid(np.arange(n), np.arange(n), indexing='ij')
+        mask = (jj > ii) & ((jj - ii) >= MIN_SEQ_SEP) & (dist < CA_SIGMA)
+
+        if not np.any(mask):
+            return 0.0
+
+        r = np.maximum(dist[mask], 0.1)
+        ratios = CA_SIGMA / r
+        return float(np.sum(CA_EPSILON * ratios ** 12))
 
     def _compute_all_atoms(self, coords: np.ndarray, n: int) -> float:
-        """All backbone atom (N, CA, C) repulsive potential."""
-        flat = coords.reshape(-1, 3)  # shape (3*N, 3)
+        """All backbone atom repulsive potential (vectorized)."""
+        flat = coords.reshape(-1, 3)  # (3*N, 3)
         n_atoms = len(flat)
-        energy = 0.0
 
-        for i in range(n_atoms):
-            res_i = i // 3
-            for j in range(i + 1, n_atoms):
-                res_j = j // 3
-                if abs(res_j - res_i) < MIN_SEQ_SEP:
-                    continue
+        diff = flat[:, None, :] - flat[None, :, :]  # (3N, 3N, 3)
+        dist = np.linalg.norm(diff, axis=2)          # (3N, 3N)
 
-                r = np.linalg.norm(flat[j] - flat[i])
-                if r < BACKBONE_SIGMA:
-                    ratio = BACKBONE_SIGMA / max(r, 0.1)
-                    energy += BACKBONE_EPSILON * ratio ** 12
-        return energy
+        # Residue indices for each atom
+        res_idx = np.arange(n_atoms) // 3
+        res_i = res_idx[:, None]
+        res_j = res_idx[None, :]
+
+        mask = (res_j > res_i) & (np.abs(res_j - res_i) >= MIN_SEQ_SEP) & (dist < BACKBONE_SIGMA)
+
+        if not np.any(mask):
+            return 0.0
+
+        r = np.maximum(dist[mask], 0.1)
+        ratios = BACKBONE_SIGMA / r
+        return float(np.sum(BACKBONE_EPSILON * ratios ** 12))
