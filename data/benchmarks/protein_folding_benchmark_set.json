@@ -1,0 +1,805 @@
+{
+  "metadata": {
+    "description": "Curated benchmark set of proteins for testing a protein folding simulator",
+    "date_created": "2026-03-24",
+    "selection_criteria": {
+      "resolution": "Prefer <=1.5A, accept <=2.0A for special cases",
+      "method": "X-ray crystallography or high-res cryo-EM",
+      "uniprot": "Must have UniProt entry for AlphaFold DB lookup",
+      "alphafold": "High pLDDT (>90) for most of chain preferred"
+    },
+    "notes": [
+      "PDB resolutions and chain lengths verified via RCSB PDB web queries (March 2026).",
+      "NMR-only structures are noted where no X-ray alternative exists.",
+      "AlphaFold DB entries can be accessed at https://alphafold.ebi.ac.uk/entry/{UniProt_ID}",
+      "Some fold-switching and co-translational entries have resolutions >1.5A due to inherent experimental difficulty."
+    ]
+  },
+  "categories": {
+    "1_ultra_small_miniproteins": {
+      "description": "Miniproteins (10-30 residues) with known fast-folding kinetics. Classic MD simulation benchmarks.",
+      "candidates": [
+        {
+          "name": "Villin headpiece subdomain HP35 (N68H)",
+          "pdb_id": "1YRF",
+          "chain": "A",
+          "resolution_A": 1.07,
+          "method": "X-ray diffraction",
+          "residues": 35,
+          "organism": "Gallus gallus (chicken)",
+          "fold_type": "Three-helix bundle (all-alpha miniprotein)",
+          "uniprot_id": "P02640",
+          "alphafold_db": "https://alphafold.ebi.ac.uk/entry/P02640",
+          "folding_time": "~0.7 us (ultrafast folder)",
+          "benchmark_rationale": "The gold-standard ultrafast folding benchmark. Sub-microsecond folding, extensively simulated on Anton supercomputer (D.E. Shaw). 1.07A resolution is exceptional for a 35-residue peptide. Well-characterized phi-value analysis and mutant data."
+        },
+        {
+          "name": "Villin headpiece HP35 (norleucine variant)",
+          "pdb_id": "2F4K",
+          "chain": "A",
+          "resolution_A": 1.05,
+          "method": "X-ray diffraction",
+          "residues": 35,
+          "organism": "Gallus gallus (chicken, synthetic variant)",
+          "fold_type": "Three-helix bundle",
+          "uniprot_id": "P02640",
+          "alphafold_db": "https://alphafold.ebi.ac.uk/entry/P02640",
+          "folding_time": "~0.5 us (fastest HP35 variant)",
+          "benchmark_rationale": "Fastest-folding HP35 variant with K65Nle, K70Nle substitutions. Even higher resolution (1.05A) than wild-type. Ideal for testing the effect of hydrophobic core optimization on folding kinetics."
+        },
+        {
+          "name": "Chignolin CLN025",
+          "pdb_id": "5AWL",
+          "chain": "A",
+          "resolution_A": 1.11,
+          "method": "X-ray diffraction",
+          "residues": 10,
+          "organism": "Synthetic construct",
+          "fold_type": "Beta-hairpin",
+          "uniprot_id": "N/A (synthetic; NMR parent structure 1UAO)",
+          "alphafold_db": "N/A",
+          "folding_time": "~0.6 us",
+          "benchmark_rationale": "Smallest protein with a defined crystal structure. 10-residue beta-hairpin. CLN025 is a stabilized mutant of chignolin (1UAO). Folding simulated to completion on Anton. Essential test for beta-sheet nucleation. 1.11A X-ray resolution is remarkable for 10 residues."
+        },
+        {
+          "name": "Trp-cage TC5b",
+          "pdb_id": "1L2Y",
+          "chain": "A",
+          "resolution_A": null,
+          "method": "Solution NMR (20 conformers)",
+          "residues": 20,
+          "organism": "Synthetic construct (designed from exendin-4)",
+          "fold_type": "Alpha-helix + polyproline II + hydrophobic cage",
+          "uniprot_id": "N/A (synthetic; no crystal structure available)",
+          "alphafold_db": "N/A",
+          "folding_time": "~4 us",
+          "benchmark_rationale": "The most widely simulated miniprotein. 20-residue designed peptide that folds in ~4 us. Mixed secondary structure (helix, PPII, cage). Only NMR structure available (no crystal), but extensively validated by MD. Completed folding on Anton. Critical test for Trp sidechain burial."
+        }
+      ]
+    },
+    "2_small_single_domain": {
+      "description": "Well-studied small single-domain proteins (30-80 residues). Extensive folding kinetics and phi-value data.",
+      "candidates": [
+        {
+          "name": "Protein G B1 domain (GB1)",
+          "pdb_id": "3MP9",
+          "chain": "A",
+          "resolution_A": 1.20,
+          "method": "X-ray diffraction",
+          "residues": 56,
+          "organism": "Streptococcus sp. group G",
+          "fold_type": "Alpha/beta (4-strand beta-sheet + alpha-helix)",
+          "uniprot_id": "P06654",
+          "alphafold_db": "https://alphafold.ebi.ac.uk/entry/P06654",
+          "folding_time": "~4 ms (two-state folder)",
+          "benchmark_rationale": "Canonical small protein benchmark. Two-state folder with extensive NMR, phi-value, and simulation data. Mixed alpha/beta fold tests both secondary structure types. 1.20A resolution at pH 3.0 provides exceptional structural detail."
+        },
+        {
+          "name": "WW domain (Nedd4-1, 3rd WW domain)",
+          "pdb_id": "4N7F",
+          "chain": "A",
+          "resolution_A": 1.10,
+          "method": "X-ray diffraction",
+          "residues": 38,
+          "organism": "Homo sapiens",
+          "fold_type": "All-beta (triple-stranded antiparallel beta-sheet)",
+          "uniprot_id": "P46934",
+          "alphafold_db": "https://alphafold.ebi.ac.uk/entry/P46934",
+          "folding_time": "~15-80 us (among fastest beta-sheet folders)",
+          "benchmark_rationale": "Smallest naturally occurring beta-sheet domain. 1.10A resolution is outstanding. WW domains fold via a complex mechanism with both two-state and three-state variants. FBP28 WW domain was folded on Anton. Tests pure beta-sheet formation without alpha-helices."
+        },
+        {
+          "name": "Alpha-spectrin SH3 domain",
+          "pdb_id": "1U06",
+          "chain": "A",
+          "resolution_A": 1.49,
+          "method": "X-ray diffraction",
+          "residues": 62,
+          "organism": "Gallus gallus (chicken)",
+          "fold_type": "All-beta (SH3-fold, 5-strand beta-barrel)",
+          "uniprot_id": "P07751",
+          "alphafold_db": "https://alphafold.ebi.ac.uk/entry/P07751",
+          "folding_time": "~50 ms",
+          "benchmark_rationale": "Classic two-state folder with extensive phi-value analysis. The SH3 fold is a fundamental beta-barrel topology. 1.49A resolution. Well-studied folding nucleus around the distal loop and diverging turn. Mutant at 1.12A also available (PDB: 1HD3 family)."
+        },
+        {
+          "name": "Ubiquitin",
+          "pdb_id": "1UBQ",
+          "chain": "A",
+          "resolution_A": 1.80,
+          "method": "X-ray diffraction",
+          "residues": 76,
+          "organism": "Homo sapiens",
+          "fold_type": "Alpha/beta (beta-grasp / ubiquitin-like fold)",
+          "uniprot_id": "P0CG48",
+          "alphafold_db": "https://alphafold.ebi.ac.uk/entry/P0CG48",
+          "folding_time": "~5 ms (complex mechanism, on-pathway intermediate)",
+          "benchmark_rationale": "One of the most studied proteins in structural biology. 76 residues, mixed alpha/beta fold. 28 phi-values measured. Complex folding with possible on-pathway intermediate. 1UBQ is the canonical reference structure (1.80A). Also see 3ONS (1.80A, alternate crystal form)."
+        },
+        {
+          "name": "Rop protein (ColE1 repressor of primer) 2AA mutant",
+          "pdb_id": "1NKD",
+          "chain": "A",
+          "resolution_A": 1.09,
+          "method": "X-ray diffraction",
+          "residues": 63,
+          "organism": "Escherichia coli",
+          "fold_type": "All-alpha (four-helix bundle, homodimer)",
+          "uniprot_id": "P03051",
+          "alphafold_db": "https://alphafold.ebi.ac.uk/entry/P03051",
+          "folding_time": "N/A (dimer folding)",
+          "benchmark_rationale": "Atomic resolution (1.09A) four-helix bundle. The monomer is 63 residues with two alpha-helices; the functional unit is a homodimer forming a four-helix bundle. Tests both helical folding and dimerization. Wild-type 1ROP at 1.7A also available."
+        }
+      ]
+    },
+    "3_medium_single_domain": {
+      "description": "Medium single-domain proteins (80-150 residues). Classic structural biology targets with extensive folding characterization.",
+      "candidates": [
+        {
+          "name": "Barnase",
+          "pdb_id": "1A2P",
+          "chain": "A",
+          "resolution_A": 1.50,
+          "method": "X-ray diffraction",
+          "residues": 110,
+          "organism": "Bacillus amyloliquefaciens",
+          "fold_type": "Alpha/beta (5-strand beta-sheet + 2 alpha-helices)",
+          "uniprot_id": "P00648",
+          "alphafold_db": "https://alphafold.ebi.ac.uk/entry/P00648",
+          "folding_time": "~50 ms (three-state with intermediate)",
+          "benchmark_rationale": "The most extensively phi-value-mapped protein in existence. Over 100 mutants characterized. Three-state folding with a well-defined intermediate. 1.50A resolution. Barnase/barstar is also the classic protein-protein interaction benchmark. 400+ mutants with stability data."
+        },
+        {
+          "name": "Hen egg-white lysozyme (HEWL)",
+          "pdb_id": "1LKS",
+          "chain": "A",
+          "resolution_A": 1.10,
+          "method": "X-ray diffraction",
+          "residues": 129,
+          "organism": "Gallus gallus (chicken)",
+          "fold_type": "Alpha+beta (alpha-domain + beta-domain, 4 disulfide bonds)",
+          "uniprot_id": "P00698",
+          "alphafold_db": "https://alphafold.ebi.ac.uk/entry/P00698",
+          "folding_time": "~50 ms (multi-pathway folding)",
+          "benchmark_rationale": "The first enzyme crystal structure ever solved (1965). 1.10A sub-angstrom resolution. Contains 4 disulfide bonds that constrain folding. Two structural domains (alpha and beta) with complex multi-pathway folding mechanism studied by hydrogen exchange. 129 residues."
+        },
+        {
+          "name": "Sperm whale myoglobin (deoxy form)",
+          "pdb_id": "1BZR",
+          "chain": "A",
+          "resolution_A": 1.15,
+          "method": "X-ray diffraction",
+          "residues": 153,
+          "organism": "Physeter macrocephalus (sperm whale)",
+          "fold_type": "All-alpha (globin fold, 8 alpha-helices)",
+          "uniprot_id": "P02185",
+          "alphafold_db": "https://alphafold.ebi.ac.uk/entry/P02185",
+          "folding_time": "~10 ms (complex, heme-dependent)",
+          "benchmark_rationale": "Iconic all-alpha protein with heme cofactor. 1.15A atomic resolution. The globin fold is one of the most common folds in nature. Folding involves a molten-globule intermediate. Tests cofactor-dependent folding. 153 residues with 8 helices (A-H). First protein structure solved by X-ray (Kendrew, 1958)."
+        },
+        {
+          "name": "E. coli dihydrofolate reductase (DHFR)",
+          "pdb_id": "6CXK",
+          "chain": "A",
+          "resolution_A": 1.11,
+          "method": "X-ray diffraction",
+          "residues": 165,
+          "organism": "Escherichia coli",
+          "fold_type": "Alpha/beta (Rossmann-like fold, 8-strand mixed beta-sheet)",
+          "uniprot_id": "P0ABQ4",
+          "alphafold_db": "https://alphafold.ebi.ac.uk/entry/P0ABQ4",
+          "folding_time": "~2 s (slow, complex folding with multiple intermediates)",
+          "benchmark_rationale": "Classic alpha/beta protein with complex multi-state folding. Multiple intermediates observed by stopped-flow and NMR. 1.11A atomic resolution. Well-characterized conformational changes upon substrate binding. Important drug target (methotrexate, trimethoprim). 165 residues."
+        },
+        {
+          "name": "Calmodulin (Ca2+-bound)",
+          "pdb_id": "1EXR",
+          "chain": "A",
+          "resolution_A": 1.00,
+          "method": "X-ray diffraction",
+          "residues": 148,
+          "organism": "Paramecium tetraurelia",
+          "fold_type": "All-alpha (EF-hand domains, dumbbell shape)",
+          "uniprot_id": "P07463",
+          "alphafold_db": "https://alphafold.ebi.ac.uk/entry/P07463",
+          "folding_time": "~5 ms per domain",
+          "benchmark_rationale": "1.00A atomic resolution - among the highest for a 148-residue protein. Two EF-hand domains connected by a flexible central helix. Tests multi-domain alpha-helical folding with Ca2+ binding. 36 discretely disordered residues reveal conformational flexibility crucial for function."
+        }
+      ]
+    },
+    "4_all_alpha": {
+      "description": "Pure helical proteins: helical bundles, coiled coils, EF-hand domains.",
+      "candidates": [
+        {
+          "name": "Cytochrome b562 (E. coli)",
+          "pdb_id": "256B",
+          "chain": "A",
+          "resolution_A": 1.40,
+          "method": "X-ray diffraction",
+          "residues": 106,
+          "organism": "Escherichia coli",
+          "fold_type": "All-alpha (four-helix bundle with heme)",
+          "uniprot_id": "P0ABE7",
+          "alphafold_db": "https://alphafold.ebi.ac.uk/entry/P0ABE7",
+          "benchmark_rationale": "Classic natural four-helix bundle. 1.40A resolution. Folding triggered by electron transfer approaches the speed limit for four-helix bundle formation (~5 us). Well-studied apo form (without heme) also folds into a structured molten globule."
+        },
+        {
+          "name": "Rop protein (ColE1 Rop, wild-type)",
+          "pdb_id": "1ROP",
+          "chain": "A",
+          "resolution_A": 1.70,
+          "method": "X-ray diffraction",
+          "residues": 63,
+          "organism": "Escherichia coli",
+          "fold_type": "All-alpha (antiparallel four-helix bundle, homodimer)",
+          "uniprot_id": "P03051",
+          "alphafold_db": "https://alphafold.ebi.ac.uk/entry/P03051",
+          "benchmark_rationale": "Simplest natural four-helix bundle. Each monomer is two helices; the dimer forms a canonical antiparallel four-helix bundle. 1.70A resolution for wild-type. Extensive mutational data on folding and stability. Atomic resolution (1.09A) mutant available as 1NKD."
+        },
+        {
+          "name": "Calmodulin (Ca2+-bound, atomic resolution)",
+          "pdb_id": "1EXR",
+          "chain": "A",
+          "resolution_A": 1.00,
+          "method": "X-ray diffraction",
+          "residues": 148,
+          "organism": "Paramecium tetraurelia",
+          "fold_type": "All-alpha (EF-hand, 7 alpha-helices, dumbbell)",
+          "uniprot_id": "P07463",
+          "alphafold_db": "https://alphafold.ebi.ac.uk/entry/P07463",
+          "benchmark_rationale": "1.00A resolution all-alpha protein. EF-hand calcium-binding motif is a fundamental helical fold. Two globular domains connected by a flexible helix provide inter-domain folding challenge. Also tests metal-dependent folding."
+        },
+        {
+          "name": "Sperm whale myoglobin",
+          "pdb_id": "1BZR",
+          "chain": "A",
+          "resolution_A": 1.15,
+          "method": "X-ray diffraction",
+          "residues": 153,
+          "organism": "Physeter macrocephalus",
+          "fold_type": "All-alpha (globin fold, 8 helices A-H)",
+          "uniprot_id": "P02185",
+          "alphafold_db": "https://alphafold.ebi.ac.uk/entry/P02185",
+          "benchmark_rationale": "Canonical globin fold at 1.15A. All-alpha with no beta-sheet. 8 helices packed around a heme group. Tests helical packing and cofactor accommodation. Apomyoglobin folding involves a well-characterized molten globule intermediate formed by helices A, G, H."
+        },
+        {
+          "name": "Villin headpiece HP35",
+          "pdb_id": "1YRF",
+          "chain": "A",
+          "resolution_A": 1.07,
+          "method": "X-ray diffraction",
+          "residues": 35,
+          "organism": "Gallus gallus",
+          "fold_type": "All-alpha (three-helix bundle)",
+          "uniprot_id": "P02640",
+          "alphafold_db": "https://alphafold.ebi.ac.uk/entry/P02640",
+          "benchmark_rationale": "Smallest three-helix bundle with sub-microsecond folding. 1.07A resolution. Tests helical nucleation and tertiary packing of a minimal all-alpha fold."
+        }
+      ]
+    },
+    "5_all_beta": {
+      "description": "Pure beta-sheet proteins: immunoglobulin domains, beta-barrels, beta-sandwiches.",
+      "candidates": [
+        {
+          "name": "Titin I27 (I91) immunoglobulin domain",
+          "pdb_id": "1WAA",
+          "chain": "A",
+          "resolution_A": 1.80,
+          "method": "X-ray diffraction",
+          "residues": 93,
+          "organism": "Homo sapiens",
+          "fold_type": "All-beta (immunoglobulin-like beta-sandwich)",
+          "uniprot_id": "Q8WZ42",
+          "alphafold_db": "https://alphafold.ebi.ac.uk/entry/Q8WZ42",
+          "benchmark_rationale": "The single most studied protein in mechanical unfolding (AFM). Ig-like beta-sandwich with two 4-stranded sheets (ABED and A'GFC). Well-characterized mechanical unfolding pathway. Extensive steered MD simulation data. 1.80A resolution."
+        },
+        {
+          "name": "Alpha-spectrin SH3 domain",
+          "pdb_id": "1U06",
+          "chain": "A",
+          "resolution_A": 1.49,
+          "method": "X-ray diffraction",
+          "residues": 62,
+          "organism": "Gallus gallus",
+          "fold_type": "All-beta (SH3 beta-barrel, 5-strand)",
+          "uniprot_id": "P07751",
+          "alphafold_db": "https://alphafold.ebi.ac.uk/entry/P07751",
+          "benchmark_rationale": "Classic all-beta SH3 barrel fold. 1.49A resolution. Two-state folder with extensively mapped transition state. Tests beta-barrel formation without any alpha-helical elements."
+        },
+        {
+          "name": "WW domain (Nedd4-1 3rd WW)",
+          "pdb_id": "4N7F",
+          "chain": "A",
+          "resolution_A": 1.10,
+          "method": "X-ray diffraction",
+          "residues": 38,
+          "organism": "Homo sapiens",
+          "fold_type": "All-beta (triple-stranded antiparallel beta-sheet)",
+          "uniprot_id": "P46934",
+          "alphafold_db": "https://alphafold.ebi.ac.uk/entry/P46934",
+          "benchmark_rationale": "Smallest naturally occurring all-beta domain at 1.10A. Three antiparallel beta-strands stabilized by two conserved tryptophans. One of the fastest beta-sheet folders. Tests minimal beta-sheet nucleation."
+        },
+        {
+          "name": "Concanavalin A (lectin, jelly-roll fold)",
+          "pdb_id": "1JBC",
+          "chain": "A",
+          "resolution_A": 1.20,
+          "method": "X-ray diffraction",
+          "residues": 237,
+          "organism": "Canavalia ensiformis (jack bean)",
+          "fold_type": "All-beta (jelly-roll / beta-sandwich / lectin fold)",
+          "uniprot_id": "P02866",
+          "alphafold_db": "https://alphafold.ebi.ac.uk/entry/P02866",
+          "benchmark_rationale": "Classic all-beta jelly-roll fold at 1.20A. Large beta-sandwich with two major antiparallel beta-sheets. Tests large-scale beta-sheet assembly. Well-characterized lectin with metal binding sites."
+        },
+        {
+          "name": "OmpA transmembrane domain (beta-barrel)",
+          "pdb_id": "1QJP",
+          "chain": "A",
+          "resolution_A": 1.65,
+          "method": "X-ray diffraction",
+          "residues": 171,
+          "organism": "Escherichia coli",
+          "fold_type": "All-beta (8-strand transmembrane beta-barrel)",
+          "uniprot_id": "P0A910",
+          "alphafold_db": "https://alphafold.ebi.ac.uk/entry/P0A910",
+          "benchmark_rationale": "Transmembrane beta-barrel at 1.65A. Tests beta-barrel folding in a membrane context. 8-strand antiparallel barrel with asymmetric loops. Important for testing co-translational membrane protein insertion. Well-studied folding into lipid bilayers."
+        }
+      ]
+    },
+    "6_mixed_alpha_beta": {
+      "description": "Mixed alpha/beta folds: TIM barrels, Rossmann folds, ferredoxin/thioredoxin folds.",
+      "candidates": [
+        {
+          "name": "Xylanase (TIM barrel fold)",
+          "pdb_id": "1I1W",
+          "chain": "A",
+          "resolution_A": 0.89,
+          "method": "X-ray diffraction",
+          "residues": 303,
+          "organism": "Thermoascus aurantiacus",
+          "fold_type": "Alpha/beta (TIM barrel / (beta/alpha)8 barrel)",
+          "uniprot_id": "P23360",
+          "alphafold_db": "https://alphafold.ebi.ac.uk/entry/P23360",
+          "benchmark_rationale": "Highest-resolution TIM barrel structure in the PDB at 0.89A. The TIM barrel is the most common enzyme fold. 8 alternating beta-strands and alpha-helices form a closed barrel. Tests large-scale alpha/beta assembly and barrel closure. 303 residues."
+        },
+        {
+          "name": "E. coli DHFR (Rossmann-like fold)",
+          "pdb_id": "6CXK",
+          "chain": "A",
+          "resolution_A": 1.11,
+          "method": "X-ray diffraction",
+          "residues": 165,
+          "organism": "Escherichia coli",
+          "fold_type": "Alpha/beta (Rossmann-like fold, 8-strand mixed beta-sheet)",
+          "uniprot_id": "P0ABQ4",
+          "alphafold_db": "https://alphafold.ebi.ac.uk/entry/P0ABQ4",
+          "benchmark_rationale": "Rossmann-like nucleotide-binding fold at 1.11A. Mixed parallel and antiparallel beta-sheet flanked by helices. Well-characterized conformational changes and complex multi-state folding pathway. Tests alpha/beta assembly with cofactor binding."
+        },
+        {
+          "name": "Thioredoxin-like [2Fe-2S] ferredoxin (ferredoxin fold)",
+          "pdb_id": "1M2D",
+          "chain": "A",
+          "resolution_A": 1.05,
+          "method": "X-ray diffraction",
+          "residues": 106,
+          "organism": "Aquifex aeolicus",
+          "fold_type": "Alpha/beta (thioredoxin / ferredoxin fold: beta-alpha-beta-alpha-beta-beta)",
+          "uniprot_id": "O66511",
+          "alphafold_db": "https://alphafold.ebi.ac.uk/entry/O66511",
+          "benchmark_rationale": "Prototypical ferredoxin/thioredoxin fold at 1.05A. The ferredoxin fold (beta-alpha-beta-alpha-beta-beta) is one of the most ancient and widespread protein folds. Tests metal cluster accommodation ([2Fe-2S]) within an alpha/beta framework. Also relevant as this fold is adopted by the switched state of KaiB."
+        },
+        {
+          "name": "Barnase (alpha/beta ribonuclease)",
+          "pdb_id": "1A2P",
+          "chain": "A",
+          "resolution_A": 1.50,
+          "method": "X-ray diffraction",
+          "residues": 110,
+          "organism": "Bacillus amyloliquefaciens",
+          "fold_type": "Alpha/beta (mixed alpha-helix and antiparallel beta-sheet)",
+          "uniprot_id": "P00648",
+          "alphafold_db": "https://alphafold.ebi.ac.uk/entry/P00648",
+          "benchmark_rationale": "Alpha/beta protein with parallel and antiparallel sheet elements. Three-state folding. The most comprehensively phi-value-analyzed protein. Tests mixed alpha/beta topology assembly."
+        },
+        {
+          "name": "Protein G B1 domain (mixed alpha/beta)",
+          "pdb_id": "3MP9",
+          "chain": "A",
+          "resolution_A": 1.20,
+          "method": "X-ray diffraction",
+          "residues": 56,
+          "organism": "Streptococcus sp.",
+          "fold_type": "Alpha/beta (4-strand beta-sheet + 1 alpha-helix)",
+          "uniprot_id": "P06654",
+          "alphafold_db": "https://alphafold.ebi.ac.uk/entry/P06654",
+          "benchmark_rationale": "Minimal mixed alpha/beta fold at 1.20A. Single helix packed against a 4-strand beta-sheet. Tests alpha-beta packing. Two-state folder with extensive simulation benchmark data."
+        }
+      ]
+    },
+    "7_co_translational_folding": {
+      "description": "Proteins with experimentally characterized co-translational folding. Key benchmark for ribosome-coupled folding simulations.",
+      "candidates": [
+        {
+          "name": "Filamin domain 5 (FLN5, ddFLN rod domains 5-6)",
+          "pdb_id": "1QFH",
+          "chain": "A",
+          "resolution_A": 2.20,
+          "method": "X-ray diffraction",
+          "residues": 212,
+          "organism": "Dictyostelium discoideum",
+          "fold_type": "All-beta (immunoglobulin-like fold, rod domains 5-6)",
+          "uniprot_id": "P13466",
+          "alphafold_db": "https://alphafold.ebi.ac.uk/entry/P13466",
+          "co_translational_data": {
+            "on_ribosome_cryo_em": ["7ZQ6 (2.75A cryo-EM, 70S ribosome + FLN5 nascent chain)", "7ZQ5 (70S ribosome control)"],
+            "techniques": ["cryo-EM", "19F NMR", "15N TROSY NMR", "methyl-TROSY NMR", "MD simulations"],
+            "key_findings": "FLN5 folds co-translationally on the ribosome. Exit tunnel loops (uL22, uL23, uL24) modulate folding energetics. Partially folded intermediates are stabilized by ribosome surface contacts."
+          },
+          "benchmark_rationale": "THE benchmark protein for co-translational folding studies. Most extensive dataset combining cryo-EM, NMR, and MD on ribosome-nascent chain complexes. Ig-like fold allows comparison to isolated domain folding. 2.20A crystal structure for domains 5-6; also NMR structure of isolated FLN5 (PDB: 6G4A)."
+        },
+        {
+          "name": "Firefly luciferase (multi-domain, co-translational)",
+          "pdb_id": "1LCI",
+          "chain": "A",
+          "resolution_A": 2.00,
+          "method": "X-ray diffraction",
+          "residues": 550,
+          "organism": "Photinus pyralis (firefly)",
+          "fold_type": "Multi-domain (N-domain: alpha/beta; C-domain: alpha+beta)",
+          "uniprot_id": "P08659",
+          "alphafold_db": "https://alphafold.ebi.ac.uk/entry/P08659",
+          "co_translational_data": {
+            "techniques": ["cell-free translation", "activity assays"],
+            "key_findings": "Folds co-translationally without Hsp70 chaperones. N-terminal subdomain (residues 1-190) folds first during translation. Post-translational refolding requires DnaK/DnaJ/GrpE, but co-translational folding does not."
+          },
+          "benchmark_rationale": "Classic demonstration that co-translational folding can bypass chaperone requirements. Multi-domain protein where domain folding order matters. 550 residues, 2.00A resolution. N-domain and C-domain fold sequentially during translation."
+        },
+        {
+          "name": "CFTR NBD1 domain (co-translational domain assembly)",
+          "pdb_id": "2BBO",
+          "chain": "A",
+          "resolution_A": 2.55,
+          "method": "X-ray diffraction",
+          "residues": 291,
+          "organism": "Homo sapiens",
+          "fold_type": "Alpha/beta (ABC transporter NBD fold)",
+          "uniprot_id": "P13569",
+          "alphafold_db": "https://alphafold.ebi.ac.uk/entry/P13569",
+          "co_translational_data": {
+            "techniques": ["in vivo crosslinking", "limited proteolysis", "pulse-chase"],
+            "key_findings": "Co-translational domain assembly is essential for CFTR folding. TMD1 folds co-translationally. Early NBD1-TMD1 assembly is required. F508del disrupts this co-translational assembly pathway."
+          },
+          "benchmark_rationale": "Disease-relevant co-translational folding target. F508del mutation (found in ~70% of cystic fibrosis patients) disrupts co-translational domain assembly. 2.55A resolution. Tests how single point mutations affect co-translational folding pathways. Higher-resolution NBD1 structures: 1R0Z (2.2A, mouse, phosphorylated)."
+        },
+        {
+          "name": "Maltose-binding protein (MBP, multi-domain hinge)",
+          "pdb_id": "1ANF",
+          "chain": "A",
+          "resolution_A": 1.67,
+          "method": "X-ray diffraction",
+          "residues": 370,
+          "organism": "Escherichia coli K-12",
+          "fold_type": "Multi-domain (two alpha/beta domains connected by hinge)",
+          "uniprot_id": "P0AEX9",
+          "alphafold_db": "https://alphafold.ebi.ac.uk/entry/P0AEX9",
+          "co_translational_data": {
+            "techniques": ["SecB-dependent secretion", "in vivo folding studies"],
+            "key_findings": "Periplasmic protein that must remain unfolded for Sec translocation. Co-translational targeting vs. post-translational translocation pathways have been extensively studied."
+          },
+          "benchmark_rationale": "Two-domain protein at 1.67A with well-characterized hinge motion upon ligand binding. Classic model for studying co-translational secretion vs. folding competition. Tests domain docking and interdomain communication."
+        }
+      ]
+    },
+    "8_fold_switching": {
+      "description": "Metamorphic / fold-switching proteins that adopt completely different folds. AlphaFold typically fails on these.",
+      "candidates": [
+        {
+          "name": "RfaH (E. coli, full-length, alpha-helical CTD state)",
+          "pdb_id": "2OUG",
+          "chain": "A",
+          "resolution_A": 2.10,
+          "method": "X-ray diffraction",
+          "residues": 162,
+          "organism": "Escherichia coli",
+          "fold_type": "Alpha/beta NTD + all-alpha CTD (switches to all-beta)",
+          "uniprot_id": "P0AFW0",
+          "alphafold_db": "https://alphafold.ebi.ac.uk/entry/P0AFW0",
+          "fold_switch_details": {
+            "state_1": "CTD is alpha-helical hairpin (autoinhibited, 2OUG)",
+            "state_2": "CTD refolds to beta-barrel (active, binds ribosome; NMR: 2LCL)",
+            "trigger": "Recruitment to RNAP at ops element releases CTD",
+            "alphafold_performance": "AF2/AF3 incorrectly predict only beta-barrel for 4/5 RfaH homologs. Fails to capture alpha-helical ground state."
+          },
+          "benchmark_rationale": "Most dramatic fold switch known: entire 60-residue CTD converts from all-alpha to all-beta. AlphaFold consistently fails, predicting only the beta-barrel. 2.10A crystal structure captures the alpha-helical autoinhibited state. NMR structure 2LCL captures the beta-barrel state. Essential test for any fold prediction method claiming to handle metamorphic proteins."
+        },
+        {
+          "name": "KaiB (ground state, Thermosynechococcus elongatus)",
+          "pdb_id": "2QKE",
+          "chain": "A",
+          "resolution_A": 1.80,
+          "method": "X-ray diffraction",
+          "residues": 108,
+          "organism": "Thermosynechococcus elongatus",
+          "fold_type": "Unique KaiB fold (beta-alpha-beta-beta-alpha-alpha-beta) that switches to thioredoxin fold",
+          "uniprot_id": "Q9RBZ9",
+          "alphafold_db": "https://alphafold.ebi.ac.uk/entry/Q9RBZ9",
+          "fold_switch_details": {
+            "state_1": "Ground state (gsKaiB): unique beta-alpha-beta-beta-alpha-alpha-beta fold (2QKE, 1VGL)",
+            "state_2": "Fold-switched state (fsKaiB): thioredoxin-like fold (NMR: 5JYT)",
+            "trigger": "Temperature-dependent; the rare fold-switch creates a time delay matching Earth's 24-hour rotation",
+            "function": "Circadian clock: fsKaiB binds KaiC and initiates nighttime signaling"
+          },
+          "benchmark_rationale": "Biologically critical fold switch controlling the cyanobacterial circadian clock. Switches between a unique fold and the thioredoxin fold. Crystal structures of both states available. 2QKE at 1.80A (ground state). Mutations stabilizing the active fold destroy clock function. Tests ability to predict alternative conformational states."
+        },
+        {
+          "name": "Lymphotactin / XCL1 (monomeric chemokine fold)",
+          "pdb_id": "1J9O",
+          "chain": "A",
+          "resolution_A": null,
+          "method": "Solution NMR",
+          "residues": 93,
+          "organism": "Homo sapiens",
+          "fold_type": "Chemokine fold (monomer) <-> all-beta sandwich (dimer)",
+          "uniprot_id": "P47992",
+          "alphafold_db": "https://alphafold.ebi.ac.uk/entry/P47992",
+          "fold_switch_details": {
+            "state_1": "Monomeric chemokine fold: 3-strand antiparallel beta-sheet + C-terminal alpha-helix (1J9O)",
+            "state_2": "Dimeric all-beta-sandwich: novel fold with no structural homologs (2JP1)",
+            "trigger": "Salt concentration and temperature modulate equilibrium; both states equally populated under physiological conditions",
+            "function": "Monomer activates XCR1 receptor; dimer binds glycosaminoglycans and has anti-HIV activity"
+          },
+          "benchmark_rationale": "Unique metamorphic protein existing in 50:50 equilibrium between two completely different folds under physiological conditions. Both states are functional but with different activities. AlphaFold and AF-cluster both fail to predict the alternative dimer conformation. NMR structures only (no crystal). Disulfide-locked variants available (2N54)."
+        },
+        {
+          "name": "Selecase (monomeric metallopeptidase)",
+          "pdb_id": "4QHF",
+          "chain": "A",
+          "resolution_A": 2.10,
+          "method": "X-ray diffraction",
+          "residues": 110,
+          "organism": "Methanocaldococcus jannaschii",
+          "fold_type": "Metamorphic: monomer (active) <-> dimer (inactive) <-> tetramer (inactive, beta-sheet switch)",
+          "uniprot_id": "Q58610",
+          "alphafold_db": "https://alphafold.ebi.ac.uk/entry/Q58610",
+          "fold_switch_details": {
+            "state_1": "Monomer (Slc-1): active metallopeptidase (4QHF)",
+            "state_2": "Dimer (Slc-2): C-terminal helix swings out, domain swap (4QHG)",
+            "state_3": "Tetramer (Slc-4): C-terminal helix switches to beta-sheet (4QHH)",
+            "trigger": "Concentration-dependent equilibrium"
+          },
+          "benchmark_rationale": "Concentration-dependent fold switching with 3 distinct structural states captured by X-ray. C-terminal region converts from alpha-helix to beta-sheet upon oligomerization. 2.10A resolution for monomer. AF-cluster fails on selecase. Tests ability to predict multiple alternative conformational states."
+        }
+      ]
+    },
+    "9_point_mutations_affecting_folding": {
+      "description": "Proteins with extensively characterized single-point mutations affecting folding rate, stability, or pathway.",
+      "candidates": [
+        {
+          "name": "Barnase (>100 mutants characterized)",
+          "pdb_id": "1A2P",
+          "chain": "A",
+          "resolution_A": 1.50,
+          "method": "X-ray diffraction",
+          "residues": 110,
+          "organism": "Bacillus amyloliquefaciens",
+          "fold_type": "Alpha/beta",
+          "uniprot_id": "P00648",
+          "alphafold_db": "https://alphafold.ebi.ac.uk/entry/P00648",
+          "mutation_data": {
+            "total_mutants": ">100 characterized",
+            "phi_values": "64 mutations with measured stability changes (DDG range: -1.1 to +1.1 kcal/mol)",
+            "key_mutations": [
+              "Mutations in beta-strand 1 decrease folding rate 20-50 fold",
+              "Buried salt bridges (Arg69-Asp93, Arg83-Asp75) contribute 1.5 kcal/mol each",
+              "Barnase-to-binase stepwise mutation series analyzes evolutionary stability"
+            ],
+            "folding_rate_effects": "Up to 50-fold change in folding rate from single mutations"
+          },
+          "benchmark_rationale": "Most extensively phi-value-mapped protein. 64 single mutations with stability and kinetics data. Changes are energetically additive. Essential benchmark for testing how mutations alter folding free energy landscapes."
+        },
+        {
+          "name": "Ubiquitin (28 phi-value mutations)",
+          "pdb_id": "1UBQ",
+          "chain": "A",
+          "resolution_A": 1.80,
+          "method": "X-ray diffraction",
+          "residues": 76,
+          "organism": "Homo sapiens",
+          "fold_type": "Alpha/beta (ubiquitin / beta-grasp fold)",
+          "uniprot_id": "P0CG48",
+          "alphafold_db": "https://alphafold.ebi.ac.uk/entry/P0CG48",
+          "mutation_data": {
+            "total_mutants": "28 nondisruptive mutations of buried/partially buried residues",
+            "phi_values": "Comprehensive phi and psi analysis",
+            "key_findings": "Two-state kinetics. Transition state ensemble characterized by both phi and psi analyses."
+          },
+          "benchmark_rationale": "Comprehensive phi-value analysis of buried residues. Two-state folder with well-defined transition state. Tests whether simulator correctly predicts mutation effects on a mixed alpha/beta fold."
+        },
+        {
+          "name": "CFTR NBD1 (F508del and rescue mutations)",
+          "pdb_id": "2BBO",
+          "chain": "A",
+          "resolution_A": 2.55,
+          "method": "X-ray diffraction",
+          "residues": 291,
+          "organism": "Homo sapiens",
+          "fold_type": "Alpha/beta (ABC transporter NBD)",
+          "uniprot_id": "P13569",
+          "alphafold_db": "https://alphafold.ebi.ac.uk/entry/P13569",
+          "mutation_data": {
+            "disease_mutation": "F508del (found in ~70% of CF patients)",
+            "structural_effect": "V510 becomes solvent-exposed; increased backbone dynamics at residues 509-511",
+            "rescue_mutations": "Second-site suppressors can partially restore folding",
+            "crystal_structures": ["2BBO (WT F508)", "1XMJ (deltaF508 + ATP)"]
+          },
+          "benchmark_rationale": "Most clinically important protein folding mutation. F508del causes cystic fibrosis by disrupting NBD1 folding and domain assembly. Crystal structures of both WT and mutant. Tests ability to predict how deletions affect local stability and global folding."
+        },
+        {
+          "name": "Hen egg-white lysozyme (disulfide and cavity mutations)",
+          "pdb_id": "1LKS",
+          "chain": "A",
+          "resolution_A": 1.10,
+          "method": "X-ray diffraction",
+          "residues": 129,
+          "organism": "Gallus gallus",
+          "fold_type": "Alpha+beta",
+          "uniprot_id": "P00698",
+          "alphafold_db": "https://alphafold.ebi.ac.uk/entry/P00698",
+          "mutation_data": {
+            "key_mutations": [
+              "Disulfide bond disruption mutations alter folding pathway",
+              "Cavity-creating mutations (e.g., L99A in T4 lysozyme) are classic stability benchmarks",
+              "Human lysozyme amyloid mutations (I56T, D67H) cause hereditary amyloidosis"
+            ],
+            "folding_effects": "Multi-pathway folding with parallel alpha and beta domain folding routes"
+          },
+          "benchmark_rationale": "Extensive mutation studies on folding, stability, and amyloidosis. Disulfide bond mutations alter the folding pathway topology. Human lysozyme variants I56T and D67H cause hereditary amyloidosis through altered folding. Tests mutation effects on multi-pathway folding."
+        },
+        {
+          "name": "Protein G B1 domain (core packing mutations)",
+          "pdb_id": "3MP9",
+          "chain": "A",
+          "resolution_A": 1.20,
+          "method": "X-ray diffraction",
+          "residues": 56,
+          "organism": "Streptococcus sp.",
+          "fold_type": "Alpha/beta",
+          "uniprot_id": "P06654",
+          "alphafold_db": "https://alphafold.ebi.ac.uk/entry/P06654",
+          "mutation_data": {
+            "key_findings": "Extensive mutagenesis of hydrophobic core. Two-state folder allows clean interpretation of mutation effects. Numerous crystal structures of mutants available."
+          },
+          "benchmark_rationale": "Small two-state folder with clean mutation effects. Extensive structural data on core-packing mutants. Tests prediction of mutation effects on a small mixed alpha/beta fold without complications from intermediates."
+        }
+      ]
+    },
+    "10_multi_domain": {
+      "description": "Multi-domain proteins where domain docking order matters during co-translational folding.",
+      "candidates": [
+        {
+          "name": "Firefly luciferase",
+          "pdb_id": "1LCI",
+          "chain": "A",
+          "resolution_A": 2.00,
+          "method": "X-ray diffraction",
+          "residues": 550,
+          "organism": "Photinus pyralis",
+          "fold_type": "Multi-domain: large N-domain (alpha/beta, res 1-440) + small C-domain (alpha+beta, res 441-550)",
+          "uniprot_id": "P08659",
+          "alphafold_db": "https://alphafold.ebi.ac.uk/entry/P08659",
+          "domain_folding_order": "N-terminal subdomain (res 1-190) folds first co-translationally -> large N-domain assembles -> C-domain folds last",
+          "benchmark_rationale": "Definitive proof that co-translational folding bypasses chaperone requirements. 3 subdomains fold sequentially during translation. 550 residues at 2.00A. Tests whether simulator can reproduce the correct domain folding order."
+        },
+        {
+          "name": "Maltose-binding protein (MBP)",
+          "pdb_id": "1ANF",
+          "chain": "A",
+          "resolution_A": 1.67,
+          "method": "X-ray diffraction",
+          "residues": 370,
+          "organism": "Escherichia coli",
+          "fold_type": "Multi-domain: two alpha/beta domains connected by 3-segment hinge",
+          "uniprot_id": "P0AEX9",
+          "alphafold_db": "https://alphafold.ebi.ac.uk/entry/P0AEX9",
+          "domain_folding_order": "Individual domains fold during translation; hinge-bending motion couples the two domains for maltose binding",
+          "benchmark_rationale": "Two-domain protein at 1.67A. Venus flytrap mechanism with large conformational change upon ligand binding. Tests domain docking and inter-domain communication. Well-characterized open (unliganded) and closed (maltose-bound) states."
+        },
+        {
+          "name": "Adenylate kinase (3 domains, large hinge motion)",
+          "pdb_id": "4AKE",
+          "chain": "A",
+          "resolution_A": 2.20,
+          "method": "X-ray diffraction",
+          "residues": 214,
+          "organism": "Escherichia coli",
+          "fold_type": "Multi-domain: CORE + LID domain (res 122-159) + AMPbd domain (res 30-59)",
+          "uniprot_id": "P69441",
+          "alphafold_db": "https://alphafold.ebi.ac.uk/entry/P69441",
+          "domain_folding_order": "CORE domain provides scaffold; LID and AMPbd domains undergo large-scale hinge motions (~7A RMSD between open/closed states)",
+          "benchmark_rationale": "Three-domain protein with one of the largest characterized conformational changes (7A RMSD open->closed). Open state: 4AKE (2.20A). Closed state: 1AKE (1.90A). Tests domain docking, hinge dynamics, and large-scale conformational changes. 214 residues."
+        },
+        {
+          "name": "CFTR (full-length, multi-domain ABC transporter)",
+          "pdb_id": "6MSM",
+          "chain": "A",
+          "resolution_A": 3.20,
+          "method": "Cryo-EM",
+          "residues": 1480,
+          "organism": "Homo sapiens",
+          "fold_type": "Multi-domain: TMD1 + NBD1 + R-domain + TMD2 + NBD2",
+          "uniprot_id": "P13569",
+          "alphafold_db": "https://alphafold.ebi.ac.uk/entry/P13569",
+          "domain_folding_order": "TMD1 folds co-translationally -> NBD1 assembly with TMD1 is critical -> R-domain is intrinsically disordered -> TMD2 + NBD2 fold last. F508del disrupts early domain assembly.",
+          "benchmark_rationale": "1480-residue 5-domain protein where co-translational domain assembly order is critical for function. F508del disease mutation disrupts early steps. 3.20A cryo-EM. Individual domain structures available at higher resolution (NBD1: 2BBO at 2.55A). The ultimate test for co-translational multi-domain folding simulation."
+        },
+        {
+          "name": "Dictyostelium filamin (rod domains 4-5-6)",
+          "pdb_id": "1QFH",
+          "chain": "A",
+          "resolution_A": 2.20,
+          "method": "X-ray diffraction",
+          "residues": 212,
+          "organism": "Dictyostelium discoideum",
+          "fold_type": "Multi-domain: tandem Ig-like domains",
+          "uniprot_id": "P13466",
+          "alphafold_db": "https://alphafold.ebi.ac.uk/entry/P13466",
+          "domain_folding_order": "Sequential Ig-like domain folding during translation. FLN5 domain folds co-translationally with modulation by ribosome exit tunnel.",
+          "benchmark_rationale": "Tandem Ig-like domains at 2.20A. The FLN5 domain has the most comprehensive co-translational folding dataset (cryo-EM + NMR + MD). Tests sequential multi-domain folding where each domain must fold before the next emerges. Dimerization mediated by domain 6."
+        }
+      ]
+    }
+  },
+  "summary_table": {
+    "total_unique_proteins": 28,
+    "resolution_statistics": {
+      "sub_angstrom": ["1I1W (0.89A)"],
+      "1.0_to_1.5A": ["1EXR (1.00A)", "2F4K (1.05A)", "1M2D (1.05A)", "1YRF (1.07A)", "1NKD (1.09A)", "4N7F (1.10A)", "1LKS (1.10A)", "5AWL (1.11A)", "6CXK (1.11A)", "1BZR (1.15A)", "3MP9 (1.20A)", "1JBC (1.20A)", "256B (1.40A)", "1U06 (1.49A)", "1A2P (1.50A)"],
+      "1.5_to_2.0A": ["1ANF (1.67A)", "1QJP (1.65A)", "1ROP (1.70A)", "1UBQ (1.80A)", "2QKE (1.80A)", "1WAA (1.80A)", "1LCI (2.00A)"],
+      "above_2.0A_justified": ["2OUG (2.10A, fold switcher)", "4QHF (2.10A, fold switcher)", "1QFH (2.20A, co-translational)", "4AKE (2.20A, multi-domain)", "2BBO (2.55A, disease-relevant)", "6MSM (3.20A, cryo-EM full-length)"]
+    },
+    "organisms": [
+      "Homo sapiens",
+      "Escherichia coli",
+      "Gallus gallus",
+      "Bacillus amyloliquefaciens",
+      "Physeter macrocephalus",
+      "Thermoascus aurantiacus",
+      "Aquifex aeolicus",
+      "Paramecium tetraurelia",
+      "Streptococcus sp.",
+      "Canavalia ensiformis",
+      "Dictyostelium discoideum",
+      "Photinus pyralis",
+      "Thermosynechococcus elongatus",
+      "Methanocaldococcus jannaschii"
+    ],
+    "fold_types_covered": [
+      "All-alpha: three-helix bundle, four-helix bundle, globin fold, EF-hand",
+      "All-beta: SH3 barrel, WW domain, Ig-like sandwich, jelly-roll, beta-barrel (OmpA)",
+      "Alpha/beta: TIM barrel, Rossmann fold, ferredoxin/thioredoxin fold, ubiquitin fold",
+      "Metamorphic: alpha-to-beta switches (RfaH, KaiB, lymphotactin, selecase)",
+      "Multi-domain: tandem Ig, hinge-bending, ABC transporter"
+    ]
+  }
+}
