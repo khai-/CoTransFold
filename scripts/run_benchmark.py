@@ -34,6 +34,11 @@ def main() -> None:
                         help='Label for saving results (e.g., v0.1.0)')
     parser.add_argument('--no-tunnel', action='store_true')
     parser.add_argument('--no-chaperones', action='store_true')
+    parser.add_argument('--minimizer', default='numpy',
+                        choices=['numpy', 'fast', 'jax'],
+                        help='Minimizer backend (default: numpy)')
+    parser.add_argument('--n-proteins', type=int, default=0,
+                        help='Limit to first N proteins (0 = all)')
 
     args = parser.parse_args()
 
@@ -54,6 +59,7 @@ def main() -> None:
         use_kinetics=False,
         use_tunnel=not args.no_tunnel,
         use_chaperones=not args.no_chaperones,
+        minimizer=args.minimizer,
     )
 
     categories = [args.category] if args.category else None
@@ -62,6 +68,7 @@ def main() -> None:
         config=config,
         categories=categories,
         skip_alphafold=args.skip_alphafold,
+        n_proteins=args.n_proteins,
     )
 
     print_summary_table(results)

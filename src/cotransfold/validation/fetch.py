@@ -55,8 +55,10 @@ def fetch_pdb(pdb_id: str, force: bool = False) -> str:
 def fetch_alphafold(uniprot_id: str, force: bool = False) -> str:
     """Download an AlphaFold prediction from the AlphaFold DB.
 
+    Uses the API to discover the correct model version, then downloads.
+
     Args:
-        uniprot_id: UniProt accession (e.g., 'P0AES4')
+        uniprot_id: UniProt accession (e.g., 'P00698')
         force: re-download even if cached
 
     Returns:
@@ -64,16 +66,36 @@ def fetch_alphafold(uniprot_id: str, force: bool = False) -> str:
     """
     _ensure_cache_dir()
     uniprot_id = uniprot_id.upper()
-    filepath = CACHE_DIR / 'alphafold' / f'AF-{uniprot_id}-F1-model_v4.pdb'
 
-    if filepath.exists() and not force:
-        return str(filepath)
+    # Check for any cached version
+    af_dir = CACHE_DIR / 'alphafold'
+    existing = list(af_dir.glob(f'AF-{uniprot_id}-F1-model_v*.pdb'))
+    if existing and not force:
+        return str(existing[0])
 
-    url = (f'https://alphafold.ebi.ac.uk/files/'
-           f'AF-{uniprot_id}-F1-model_v4.pdb')
-    print(f"Downloading AlphaFold prediction for {uniprot_id}...")
+    # Query API to get the correct download URL
+    import json
+    api_url = f'https://alphafold.ebi.ac.uk/api/prediction/{uniprot_id}'
+    print(f"Querying AlphaFold DB for {uniprot_id}...")
     try:
-        urllib.request.urlretrieve(url, filepath)
+        with urllib.request.urlopen(api_url) as resp:
+            data = json.loads(resp.read())
+        if isinstance(data, list) and data:
+            pdb_url = data[0].get('pdbUrl', '')
+            version = data[0].get('latestVersion', 4)
+            plddt = data[0].get('globalMetricValue', 0)
+        else:
+            raise RuntimeError("Unexpected API response format")
+    except Exception as e:
+        raise RuntimeError(f"Failed to query AlphaFold API for {uniprot_id}: {e}")
+
+    if not pdb_url:
+        raise RuntimeError(f"No PDB URL found for {uniprot_id}")
+
+    filepath = af_dir / f'AF-{uniprot_id}-F1-model_v{version}.pdb'
+    print(f"  Downloading from {pdb_url} (pLDDT={plddt:.1f})...")
+    try:
+        urllib.request.urlretrieve(pdb_url, filepath)
         print(f"  Saved to {filepath}")
     except Exception as e:
         raise RuntimeError(f"Failed to download AlphaFold {uniprot_id}: {e}")

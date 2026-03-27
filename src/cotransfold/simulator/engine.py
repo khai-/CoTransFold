@@ -18,7 +18,7 @@ from typing import Callable
 
 import numpy as np
 
-from cotransfold.core.residue import AminoAcid, sequence_from_string, sequence_to_string
+from cotransfold.core.residue import AminoAcid, RESIDUE_PROPERTIES, sequence_from_string, sequence_to_string
 from cotransfold.core.chain import NascentChain
 from cotransfold.core.trajectory import SimulationTrajectory, StepSnapshot
 from cotransfold.energy.total import TotalEnergy
@@ -49,6 +49,14 @@ class SimulationConfig:
     use_kinetics: bool = True
     use_chaperones: bool = True
     use_solvent: bool = True
+
+    # Post-translation equilibration
+    equilibration_steps: int = 500    # Minimization steps after translation completes
+    use_equilibration: bool = True
+
+    # Helix seeding in vestibule
+    use_helix_seeding: bool = True
+    helix_propensity_threshold: float = 1.1  # Chou-Fasman threshold for helix seeding
 
     # Energy term weights
     w_ramachandran: float = 1.0
@@ -121,6 +129,15 @@ class SimulationEngine:
 
         # Minimizer
         self._use_jax = cfg.minimizer == 'jax'
+        self._use_fast = cfg.minimizer == 'fast'
+        self._energy_weights = {
+            'ramachandran': cfg.w_ramachandran,
+            'hbond': cfg.w_hbond,
+            'vanderwaals': cfg.w_vanderwaals,
+            'bonded': cfg.w_bonded,
+            'solvent': cfg.w_solvent if cfg.use_solvent else 0.0,
+            'tunnel': cfg.w_tunnel if cfg.use_tunnel else 0.0,
+        }
         if self._use_jax:
             from cotransfold.minimizer.jax_minimizer import JaxMinimizer
             self._jax_minimizer = JaxMinimizer(
@@ -128,14 +145,13 @@ class SimulationEngine:
                 ftol=cfg.minimizer_ftol,
                 gtol=cfg.minimizer_gtol,
             )
-            self._jax_weights = {
-                'ramachandran': cfg.w_ramachandran,
-                'hbond': cfg.w_hbond,
-                'vanderwaals': cfg.w_vanderwaals,
-                'bonded': cfg.w_bonded,
-                'solvent': cfg.w_solvent if cfg.use_solvent else 0.0,
-                'tunnel': cfg.w_tunnel if cfg.use_tunnel else 0.0,
-            }
+        if self._use_fast:
+            from cotransfold.minimizer.fast_minimizer import FastMinimizer
+            self._fast_minimizer = FastMinimizer(
+                max_iterations=cfg.max_steps_per_residue,
+                ftol=cfg.minimizer_ftol,
+                gtol=cfg.minimizer_gtol,
+            )
         self._minimizer = GradientMinimizer(
             max_iterations=cfg.max_steps_per_residue,
             gradient_step=cfg.minimizer_gradient_step,
@@ -192,8 +208,25 @@ class SimulationEngine:
         for i in range(n):
             aa = aa_seq[i]
 
-            # 1. Add residue at PTC with initial extended conformation
-            chain.add_residue(aa)
+            # 1. Add residue at PTC
+            # Helix seeding: if this residue is a helix-former and the
+            # vestibule is wide enough, initialize with helical angles
+            # instead of extended. This models the observation that
+            # alpha-helices form in the ribosome vestibule (cryo-EM data).
+            init_phi = np.radians(-120.0)  # default: extended
+            init_psi = np.radians(120.0)
+            if cfg.use_helix_seeding and chain.chain_length >= 3:
+                # Check if the previous few residues are in the vestibule
+                # (where helices can form, ~50-90Å from PTC)
+                if (chain.chain_length > 0 and
+                    len(chain.tunnel_position) > 0 and
+                    chain.tunnel_position[0] > 50.0):  # Earliest residue past vestibule start
+                    # Check if this is a helix-forming residue
+                    props = RESIDUE_PROPERTIES[aa]
+                    if props.helix_propensity >= cfg.helix_propensity_threshold:
+                        init_phi = np.radians(-57.0)  # alpha-helix
+                        init_psi = np.radians(-47.0)
+            chain.add_residue(aa, phi=init_phi, psi=init_psi)
 
             # 2. Update tunnel exposure
             chain.update_exposure(tunnel_length)
@@ -237,9 +270,17 @@ class SimulationEngine:
                     chain, None,
                     frozen_mask=frozen_mask,
                     max_iterations=n_steps,
-                    weights=self._jax_weights,
+                    weights=self._energy_weights,
                     tunnel_length=tunnel_length,
                     **jax_kwargs,
+                )
+            elif self._use_fast:
+                result = self._fast_minimizer.minimize(
+                    chain, self._energy,
+                    frozen_mask=frozen_mask,
+                    max_iterations=n_steps,
+                    weights=self._energy_weights,
+                    **energy_kwargs,
                 )
             else:
                 result = self._minimizer.minimize(
@@ -274,6 +315,60 @@ class SimulationEngine:
             if callback:
                 callback(snapshot)
 
+        # === Post-translation equilibration ===
+        # After all residues are translated, run extended minimization
+        # on the full chain with all residues free. This models the
+        # post-ribosomal folding that occurs after the protein is released.
+        if cfg.use_equilibration and cfg.equilibration_steps > 0 and chain.chain_length > 0:
+            # All residues are now free (no tunnel constraints)
+            free_mask = np.ones(chain.chain_length)
+
+            # Energy kwargs without tunnel (protein has been released)
+            eq_kwargs = {}
+            if cfg.use_tunnel:
+                # Keep tunnel positions for solvent calculation but
+                # mark all as outside tunnel for energy
+                eq_kwargs['tunnel_positions'] = np.full(
+                    chain.chain_length, tunnel_length + 100.0)
+                eq_kwargs['tunnel_length'] = tunnel_length
+
+            if self._use_fast:
+                result = self._fast_minimizer.minimize(
+                    chain, self._energy,
+                    frozen_mask=free_mask,
+                    max_iterations=cfg.equilibration_steps,
+                    weights=self._energy_weights,
+                    **eq_kwargs,
+                )
+            else:
+                result = self._minimizer.minimize(
+                    chain, self._energy,
+                    frozen_mask=free_mask,
+                    max_iterations=cfg.equilibration_steps,
+                    **eq_kwargs,
+                )
+
+            # Record final equilibrated state as last snapshot
+            energy_decomposed = self._energy.compute_decomposed(chain, **eq_kwargs)
+            energy_total = sum(energy_decomposed.values())
+            eq_snapshot = StepSnapshot(
+                step=n,
+                amino_acid=aa_seq[-1],
+                chain_length=chain.chain_length,
+                num_exposed=chain.chain_length,  # All exposed post-release
+                energy_total=energy_total,
+                energy_decomposed=energy_decomposed,
+                folding_time=0.0,
+                is_rare_codon=False,
+                minimization_iterations=result.n_iterations,
+                minimization_converged=result.converged,
+                backbone=chain.backbone.copy(),
+            )
+            trajectory.add_snapshot(eq_snapshot)
+
+            if callback:
+                callback(eq_snapshot)
+
         return trajectory
 
     def simulate_and_export(self,
@@ -301,7 +396,9 @@ class SimulationEngine:
         trajectory = self.simulate(sequence, codons)
 
         if trajectory.final_backbone:
+            from cotransfold.structure.confidence import compute_confidence
             coords = torsion_to_cartesian(trajectory.final_backbone)
-            write_pdb(output_pdb, coords, aa_seq)
+            conf = compute_confidence(trajectory.final_backbone, aa_seq)
+            write_pdb(output_pdb, coords, aa_seq, confidence=conf.per_residue)
 
         return trajectory

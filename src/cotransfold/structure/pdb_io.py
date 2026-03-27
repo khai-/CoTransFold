@@ -13,7 +13,8 @@ def write_pdb(filepath: str,
               coords: np.ndarray,
               sequence: list[AminoAcid],
               chain_id: str = 'A',
-              model_num: int | None = None) -> None:
+              model_num: int | None = None,
+              confidence: np.ndarray | None = None) -> None:
     """Write backbone coordinates to a PDB file.
 
     Args:
@@ -22,6 +23,8 @@ def write_pdb(filepath: str,
         sequence: amino acid sequence
         chain_id: PDB chain identifier
         model_num: optional MODEL number for multi-model files
+        confidence: optional per-residue confidence scores (0-100),
+                    written to B-factor column for visualization
     """
     assert len(coords) == len(sequence), (
         f"coords ({len(coords)}) and sequence ({len(sequence)}) length mismatch")
@@ -34,6 +37,7 @@ def write_pdb(filepath: str,
     for res_idx, (res_coords, aa) in enumerate(zip(coords, sequence)):
         res_name = THREE_LETTER[aa]
         res_num = res_idx + 1
+        bfactor = confidence[res_idx] if confidence is not None else 0.00
 
         for atom_idx, atom_name in enumerate(BACKBONE_ATOM_NAMES):
             x, y, z = res_coords[atom_idx]
@@ -42,7 +46,7 @@ def write_pdb(filepath: str,
                 f"ATOM  {atom_serial:5d} {atom_name:<4s} {res_name:3s} "
                 f"{chain_id}{res_num:4d}    "
                 f"{x:8.3f}{y:8.3f}{z:8.3f}"
-                f"{1.00:6.2f}{0.00:6.2f}          "
+                f"{1.00:6.2f}{bfactor:6.2f}          "
                 f"{atom_name[0]:>2s}"
             )
             lines.append(line)

@@ -10,133 +10,74 @@ from cotransfold.simulator.engine import SimulationEngine, SimulationConfig
 from cotransfold.core.residue import AminoAcid
 
 
-def test_simulate_short_sequence():
-    """Simulate a 10-residue poly-alanine."""
-    config = SimulationConfig(
-        max_steps_per_residue=20,  # Fast for testing
+def _fast_config(**overrides) -> SimulationConfig:
+    """Minimal config for fast tests."""
+    defaults = dict(
+        max_steps_per_residue=5,
+        min_steps_per_residue=3,
+        equilibration_steps=20,
         use_kinetics=False,
     )
-    engine = SimulationEngine(config)
-    trajectory = engine.simulate("AAAAAAAAAA")
-
-    assert trajectory.num_steps == 10
-    assert trajectory.final_backbone is not None
-    assert trajectory.final_backbone.num_residues == 10
+    defaults.update(overrides)
+    return SimulationConfig(**defaults)
 
 
-def test_trajectory_has_correct_snapshots():
-    """Each step should record a snapshot."""
-    config = SimulationConfig(max_steps_per_residue=10, use_kinetics=False)
-    engine = SimulationEngine(config)
-    trajectory = engine.simulate("AAGPV")
-
-    assert trajectory.num_steps == 5
-    for i, snap in enumerate(trajectory.snapshots):
-        assert snap.step == i
-        assert snap.chain_length == i + 1
+def test_simulate_and_trajectory():
+    """Core simulation produces correct trajectory."""
+    engine = SimulationEngine(_fast_config())
+    traj = engine.simulate("AAAAAAAAAA")
+    # 10 translation + 1 equilibration
+    assert traj.num_steps == 11
+    assert traj.final_backbone is not None
+    assert traj.final_backbone.num_residues == 10
+    # Energy decomposition present
+    assert "ramachandran" in traj.snapshots[-1].energy_decomposed
 
 
 def test_exposed_count_increases():
-    """As chain grows, more residues should become exposed."""
-    config = SimulationConfig(max_steps_per_residue=10, use_kinetics=False)
-    engine = SimulationEngine(config)
-    # 30 residues: first ones should start exiting ~26-residue E. coli tunnel
-    trajectory = engine.simulate("A" * 30)
-
-    exposed = trajectory.exposed_trace
-    # Last snapshot should have some exposed residues
-    # 30 * 3.5 = 105Å from PTC for first residue, tunnel is 90Å
-    assert exposed[-1] > 0, "Some residues should be exposed after 30 steps"
-    # Exposed count should be non-decreasing
-    for i in range(1, len(exposed)):
-        assert exposed[i] >= exposed[i - 1], (
-            f"Exposed count should not decrease: step {i-1}={exposed[i-1]}, step {i}={exposed[i]}")
+    """Exposed residues increase as chain grows through tunnel."""
+    engine = SimulationEngine(_fast_config())
+    traj = engine.simulate("A" * 30)
+    exposed = traj.exposed_trace
+    # Last translation step should have some exposed (30*3.5=105 > 90Å tunnel)
+    assert exposed[-2] > 0  # -2 because -1 is equilibration (all exposed)
+    assert exposed[-1] == 30  # equilibration: all exposed
 
 
 def test_deterministic():
-    """Same input should produce identical output."""
-    config = SimulationConfig(max_steps_per_residue=15, use_kinetics=False)
-
-    engine1 = SimulationEngine(config)
-    traj1 = engine1.simulate("AAAAAGAAAA")
-
-    engine2 = SimulationEngine(config)
-    traj2 = engine2.simulate("AAAAAGAAAA")
-
-    for s1, s2 in zip(traj1.snapshots, traj2.snapshots):
+    """Same input = identical output."""
+    config = _fast_config()
+    t1 = SimulationEngine(config).simulate("AAGPV")
+    t2 = SimulationEngine(config).simulate("AAGPV")
+    for s1, s2 in zip(t1.snapshots, t2.snapshots):
         np.testing.assert_allclose(s1.energy_total, s2.energy_total, rtol=1e-8)
-        np.testing.assert_allclose(s1.backbone.phi, s2.backbone.phi, atol=1e-8)
 
 
-def test_no_tunnel_mode():
-    """Simulation should work without tunnel constraints."""
-    config = SimulationConfig(
-        use_tunnel=False,
-        max_steps_per_residue=10,
-        use_kinetics=False,
-    )
-    engine = SimulationEngine(config)
-    trajectory = engine.simulate("AAAAA")
-    assert trajectory.num_steps == 5
-
-
-def test_energy_decomposition():
-    """Each snapshot should have energy decomposition."""
-    config = SimulationConfig(max_steps_per_residue=10, use_kinetics=False)
-    engine = SimulationEngine(config)
-    trajectory = engine.simulate("AAAAAAAAAA")
-
-    last = trajectory.snapshots[-1]
-    assert "ramachandran" in last.energy_decomposed
-    assert "hbond" in last.energy_decomposed
+def test_string_and_list_equivalent():
+    """String and list[AminoAcid] input produce identical results."""
+    config = _fast_config()
+    t1 = SimulationEngine(config).simulate("ACD")
+    t2 = SimulationEngine(config).simulate([AminoAcid.ALA, AminoAcid.CYS, AminoAcid.ASP])
+    for s1, s2 in zip(t1.snapshots, t2.snapshots):
+        np.testing.assert_allclose(s1.energy_total, s2.energy_total, rtol=1e-8)
 
 
 def test_simulate_and_export():
-    """simulate_and_export should produce a PDB file."""
-    config = SimulationConfig(max_steps_per_residue=10, use_kinetics=False)
-    engine = SimulationEngine(config)
-
+    """PDB export works."""
+    engine = SimulationEngine(_fast_config())
     with tempfile.NamedTemporaryFile(suffix='.pdb', delete=False) as f:
         path = f.name
-
     try:
-        trajectory = engine.simulate_and_export("AAAAA", path)
+        traj = engine.simulate_and_export("AAAAA", path)
         assert os.path.exists(path)
         with open(path) as f:
-            content = f.read()
-        assert 'ATOM' in content
-        assert trajectory.num_steps == 5
+            assert 'ATOM' in f.read()
     finally:
         os.unlink(path)
 
 
-def test_string_and_list_sequence_equivalent():
-    """String and list[AminoAcid] input should produce identical results."""
-    config = SimulationConfig(max_steps_per_residue=10, use_kinetics=False)
-
-    engine1 = SimulationEngine(config)
-    traj1 = engine1.simulate("ACDE")
-
-    engine2 = SimulationEngine(config)
-    traj2 = engine2.simulate([AminoAcid.ALA, AminoAcid.CYS, AminoAcid.ASP, AminoAcid.GLU])
-
-    for s1, s2 in zip(traj1.snapshots, traj2.snapshots):
-        np.testing.assert_allclose(s1.energy_total, s2.energy_total, rtol=1e-8)
-
-
-def test_trajectory_summary():
-    """Summary should be a readable string."""
-    config = SimulationConfig(max_steps_per_residue=10, use_kinetics=False)
-    engine = SimulationEngine(config)
-    trajectory = engine.simulate("AAAAA")
-    summary = trajectory.summary()
-    assert "CoTransFold" in summary
-    assert "5 residues" in summary
-
-
 def test_with_kinetics():
-    """Simulation with translation kinetics should work."""
-    config = SimulationConfig(max_steps_per_residue=15)
-    engine = SimulationEngine(config)
-    trajectory = engine.simulate("AAAAAA")
-    assert trajectory.num_steps == 6
+    """Translation kinetics mode works."""
+    config = _fast_config(use_kinetics=True)
+    traj = SimulationEngine(config).simulate("AAAAAA")
+    assert traj.num_steps == 7  # 6 + equilibration

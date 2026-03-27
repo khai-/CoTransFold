@@ -93,8 +93,8 @@ def compare_one(entry: BenchmarkEntry,
         exp_ca = exp_struct.ca_coords
         exp_seq = exp_struct.sequence
     except Exception as e:
-        print(f"  WARNING: Could not fetch PDB {entry.pdb_id}: {e}")
-        print(f"  Using sequence from benchmark entry instead")
+        print(f"  WARNING: Could not fetch PDB {entry.pdb_id}: {e}", flush=True)
+        print(f"  Using sequence from benchmark entry instead", flush=True)
         exp_ca = None
         exp_seq = entry.sequence
 
@@ -118,7 +118,7 @@ def compare_one(entry: BenchmarkEntry,
                 af_tm = tm_score(af_ca_trimmed, exp_ca_trimmed)
                 af_gdt = gdt_ts(af_ca_trimmed, exp_ca_trimmed)
         except Exception as e:
-            print(f"  WARNING: Could not fetch AlphaFold for {entry.uniprot_id}: {e}")
+            print(f"  WARNING: Could not fetch AlphaFold for {entry.uniprot_id}: {e}", flush=True)
 
     # 3. Run CoTransFold simulation
     seq = exp_seq if exp_seq else entry.sequence
@@ -168,6 +168,7 @@ def compare_one(entry: BenchmarkEntry,
 def run_full_benchmark(config: SimulationConfig | None = None,
                        categories: list[str] | None = None,
                        skip_alphafold: bool = False,
+                       n_proteins: int = 0,
                        ) -> list[ComparisonResult]:
     """Run comparison on all (or selected) benchmark proteins.
 
@@ -190,17 +191,19 @@ def run_full_benchmark(config: SimulationConfig | None = None,
     entries = BENCHMARK_SET
     if categories:
         entries = [e for e in entries if e.category in categories]
+    if n_proteins > 0:
+        entries = entries[:n_proteins]
 
     results = []
-    for entry in entries:
+    for i, entry in enumerate(entries, 1):
         print(f"\n{'='*60}")
-        print(f"Benchmark: {entry.name} ({entry.pdb_id}, {entry.n_residues} res)")
+        print(f"[{i}/{len(entries)}] {entry.name} ({entry.pdb_id}, {entry.n_residues} res)")
         print(f"Category: {entry.category} | Fold: {entry.fold_class}")
-        print(f"{'='*60}")
+        print(f"{'='*60}", flush=True)
 
         result = compare_one(entry, engine, skip_alphafold=skip_alphafold)
         results.append(result)
-        print(f"  {result.summary_line()}")
+        print(f"  {result.summary_line()}", flush=True)
 
     return results
 
