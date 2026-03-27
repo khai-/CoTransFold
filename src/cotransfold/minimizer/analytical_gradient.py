@@ -168,19 +168,36 @@ def _hbond_ca_forces(coords: np.ndarray, n: int) -> np.ndarray:
         return forces
 
     n_pos = coords[:, 0]
+    ca_pos = coords[:, 1]
     c_pos = coords[:, 2]
+
+    # Place virtual O atoms (matching DSSP energy model in hbond.py)
+    o_pos = np.zeros((n, 3))
+    if n >= 2:
+        ca_c = c_pos[:n-1] - ca_pos[:n-1]
+        n_c = c_pos[:n-1] - n_pos[1:n]
+        ca_c_n = np.linalg.norm(ca_c, axis=1, keepdims=True)
+        n_c_n = np.linalg.norm(n_c, axis=1, keepdims=True)
+        ca_c_n = np.maximum(ca_c_n, 1e-10)
+        n_c_n = np.maximum(n_c_n, 1e-10)
+        bisector = ca_c / ca_c_n + n_c / n_c_n
+        bis_n = np.linalg.norm(bisector, axis=1, keepdims=True)
+        bis_n = np.maximum(bis_n, 1e-10)
+        o_pos[:n-1] = c_pos[:n-1] + 1.24 * bisector / bis_n
 
     # Check H-bond pairs in a local window (±7 residues)
     for offset in range(3, 8):
         if offset >= n:
             break
-        n_acc = n - offset  # number of valid pairs
+        n_acc = min(n - offset, n - 1)  # exclude last residue as acceptor (no valid O)
+        if n_acc <= 0:
+            continue
 
-        # Acceptor: C of residue i, Donor: N of residue i+offset
-        c_acc = c_pos[:n_acc]
+        # Acceptor: O of residue i, Donor: N of residue i+offset
+        o_acc = o_pos[:n_acc]
         n_don = n_pos[offset:offset + n_acc]
 
-        diff = c_acc - n_don
+        diff = o_acc - n_don
         dist = np.linalg.norm(diff, axis=1)
 
         close = dist < 5.2
@@ -188,7 +205,7 @@ def _hbond_ca_forces(coords: np.ndarray, n: int) -> np.ndarray:
             continue
 
         direction = diff / (dist[:, None] + 1e-10)
-        strength = 0.5 * np.maximum(0, (5.2 - dist) / 5.2)
+        strength = 0.6 * np.maximum(0, (5.2 - dist) / 5.2)
 
         for k in range(n_acc):
             if close[k]:
