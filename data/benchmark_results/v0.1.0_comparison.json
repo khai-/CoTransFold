@@ -1,0 +1,88 @@
+{
+  "results": [
+    {
+      "name": "Chignolin",
+      "pdb_id": "1UAO",
+      "n_residues": 10,
+      "resolution": 1.1,
+      "uniprot": "",
+      "af_rmsd": 0.0,
+      "af_tm": 0.0,
+      "af_gdt": 0.0,
+      "af_n": 0,
+      "ctf_rmsd": 8.581677464567829,
+      "ctf_tm": 0.00687056497341621,
+      "ctf_gdt": 0.2
+    },
+    {
+      "name": "Trp-cage",
+      "pdb_id": "1L2Y",
+      "n_residues": 20,
+      "resolution": 0.0,
+      "uniprot": "",
+      "af_rmsd": 0.0,
+      "af_tm": 0.0,
+      "af_gdt": 0.0,
+      "af_n": 0,
+      "ctf_rmsd": 16.166039231166174,
+      "ctf_tm": 0.004023091436542595,
+      "ctf_gdt": 0.0875
+    },
+    {
+      "name": "Villin HP35",
+      "pdb_id": "1YRF",
+      "n_residues": 35,
+      "resolution": 1.07,
+      "uniprot": "P02640",
+      "af_rmsd": 8.482321168884386,
+      "af_tm": 0.0858552414283863,
+      "af_gdt": 0.22142857142857142,
+      "af_n": 826,
+      "ctf_rmsd": 28.792501013610348,
+      "ctf_tm": 0.012627648273895904,
+      "ctf_gdt": 0.02142857142857143
+    },
+    {
+      "name": "Protein G B1",
+      "pdb_id": "1PGA",
+      "n_residues": 56,
+      "resolution": 1.92,
+      "uniprot": "P06654",
+      "af_rmsd": 31.762237560320695,
+      "af_tm": 0.010842251753790224,
+      "af_gdt": 0.0,
+      "af_n": 448,
+      "ctf_rmsd": 51.774054402075016,
+      "ctf_tm": 0.012256968110199926,
+      "ctf_gdt": 0.0
+    },
+    {
+      "name": "SH3 (Fyn)",
+      "pdb_id": "1SHF",
+      "n_residues": 59,
+      "resolution": 1.8,
+      "uniprot": "P06241",
+      "af_rmsd": 32.17270703152617,
+      "af_tm": 0.012360533372849076,
+      "af_gdt": 0.0,
+      "af_n": 537,
+      "ctf_rmsd": 55.76207773350661,
+      "ctf_tm": 0.011615338476994938,
+      "ctf_gdt": 0.00423728813559322
+    },
+    {
+      "name": "Ubiquitin",
+      "pdb_id": "1UBQ",
+      "n_residues": 76,
+      "resolution": 1.8,
+      "uniprot": "P0CG48",
+      "af_rmsd": 1.5995650427262704,
+      "af_tm": 0.9400473437871839,
+      "af_gdt": 0.9539473684210527,
+      "af_n": 685,
+      "ctf_rmsd": 69.80077362188679,
+      "ctf_tm": 0.01680796993063039,
+      "ctf_gdt": 0.006578947368421052
+    }
+  ]
+}

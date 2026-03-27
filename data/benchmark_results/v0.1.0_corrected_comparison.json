@@ -1,0 +1,91 @@
+{
+  "version": "v0.1.0",
+  "timestamp": "2026-03-25",
+  "correction": "AlphaFold domain extraction from full-length predictions",
+  "results": [
+    {
+      "name": "Chignolin",
+      "pdb_id": "1UAO",
+      "n_residues": 10,
+      "uniprot": "",
+      "note": "Designed beta-hairpin miniprotein",
+      "af_rmsd": 0.0,
+      "af_tm": 0.0,
+      "af_gdt": 0.0,
+      "af_note": "No UniProt (designed protein) \u2014 not in AlphaFold DB",
+      "ctf_rmsd": 8.581677464567829,
+      "ctf_tm": 0.00687056497341621,
+      "ctf_gdt": 0.2
+    },
+    {
+      "name": "Trp-cage",
+      "pdb_id": "1L2Y",
+      "n_residues": 20,
+      "uniprot": "",
+      "note": "Designed miniprotein, N-terminal helix",
+      "af_rmsd": 0.0,
+      "af_tm": 0.0,
+      "af_gdt": 0.0,
+      "af_note": "No UniProt (designed protein) \u2014 not in AlphaFold DB",
+      "ctf_rmsd": 16.166039231166174,
+      "ctf_tm": 0.004023091436542595,
+      "ctf_gdt": 0.0875
+    },
+    {
+      "name": "Villin HP35",
+      "pdb_id": "1YRF",
+      "n_residues": 35,
+      "uniprot": "P02640",
+      "note": "35-res subdomain of 826-res villin",
+      "af_rmsd": 0.7389841203824205,
+      "af_tm": 0.8683216979332931,
+      "af_gdt": 0.9714285714285714,
+      "af_note": "Domain extracted from 826-res full protein (pos 791-826)",
+      "ctf_rmsd": 28.792501013610348,
+      "ctf_tm": 0.012627648273895904,
+      "ctf_gdt": 0.02142857142857143
+    },
+    {
+      "name": "Protein G B1",
+      "pdb_id": "1PGA",
+      "n_residues": 56,
+      "uniprot": "P06654",
+      "note": "56-res domain of 448-res protein G",
+      "af_rmsd": 0.35558545878522774,
+      "af_tm": 0.9807853898044014,
+      "af_gdt": 0.9955357142857143,
+      "af_note": "Domain extracted from 448-res full protein (pos 226-282)",
+      "ctf_rmsd": 51.774054402075016,
+      "ctf_tm": 0.012256968110199926,
+      "ctf_gdt": 0.0
+    },
+    {
+      "name": "SH3 (Fyn)",
+      "pdb_id": "1SHF",
+      "n_residues": 59,
+      "uniprot": "P06241",
+      "note": "59-res domain of 537-res Fyn kinase",
+      "af_rmsd": 0.67894953442464,
+      "af_tm": 0.9477206977460761,
+      "af_gdt": 0.961864406779661,
+      "af_note": "Domain extracted from 537-res full protein (pos 83-142)",
+      "ctf_rmsd": 55.76207773350661,
+      "ctf_tm": 0.011615338476994938,
+      "ctf_gdt": 0.00423728813559322
+    },
+    {
+      "name": "Ubiquitin",
+      "pdb_id": "1UBQ",
+      "n_residues": 76,
+      "uniprot": "P0CG48",
+      "note": "76-res domain of 685-res polyubiquitin",
+      "af_rmsd": 1.5995650427262704,
+      "af_tm": 0.9400473437871839,
+      "af_gdt": 0.9539473684210527,
+      "af_note": "Domain extracted from 685-res full protein (pos 0-76)",
+      "ctf_rmsd": 69.80077362188679,
+      "ctf_tm": 0.01680796993063039,
+      "ctf_gdt": 0.006578947368421052
+    }
+  ]
+}
