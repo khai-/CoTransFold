@@ -43,7 +43,7 @@ class SimulationConfig:
     organism: str = 'ecoli'
     temperature: float = 310.15          # K (37°C)
     min_steps_per_residue: int = 20      # Minimum minimization steps
-    max_steps_per_residue: int = 100     # Maximum minimization steps
+    max_steps_per_residue: int = 250     # Maximum minimization steps
     time_to_steps_factor: float = 1000.0 # seconds -> minimization steps
     use_tunnel: bool = True
     use_kinetics: bool = True
@@ -51,7 +51,7 @@ class SimulationConfig:
     use_solvent: bool = True
 
     # Post-translation equilibration
-    equilibration_steps: int = 500    # Minimization steps after translation completes
+    equilibration_steps: int = 2000   # Minimization steps after translation completes
     use_equilibration: bool = True
 
     # Helix seeding in vestibule
@@ -73,8 +73,8 @@ class SimulationConfig:
 
     # Minimizer parameters
     minimizer: str = 'numpy'            # 'jax' (autodiff) or 'numpy' (finite differences)
-    minimizer_ftol: float = 1e-5
-    minimizer_gtol: float = 1e-3
+    minimizer_ftol: float = 1e-7
+    minimizer_gtol: float = 1e-5
     minimizer_gradient_step: float = 1e-4
 
 
