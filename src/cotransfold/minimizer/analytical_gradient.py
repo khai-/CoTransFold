@@ -266,8 +266,8 @@ def compute_analytical_energy_and_gradient(
     if weights is None:
         weights = {}
     w_rama = weights.get('ramachandran', 1.0)
-    w_vdw = weights.get('vanderwaals', 1.0)
-    w_hbond = weights.get('hbond', 1.0)
+    w_vdw = weights.get('vanderwaals', 0.7)
+    w_hbond = weights.get('hbond', 1.3)
 
     n = chain.chain_length
     if n == 0:

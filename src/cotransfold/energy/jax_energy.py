@@ -333,10 +333,10 @@ def total_energy_jax(phi: jnp.ndarray, psi: jnp.ndarray, omega: jnp.ndarray,
     if weights is None:
         weights = {}
     w_rama = weights.get('ramachandran', 1.0)
-    w_hbond = weights.get('hbond', 1.0)
-    w_vdw = weights.get('vanderwaals', 0.5)
+    w_hbond = weights.get('hbond', 1.3)
+    w_vdw = weights.get('vanderwaals', 0.7)
     w_bonded = weights.get('bonded', 0.5)
-    w_solvent = weights.get('solvent', 0.5)
+    w_solvent = weights.get('solvent', 1.3)
     w_tunnel = weights.get('tunnel', 1.0)
 
     kT = BOLTZMANN_KCAL * DEFAULT_TEMPERATURE
