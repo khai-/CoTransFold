@@ -9,6 +9,7 @@ Reference:
     Cartesian space for in silico protein structure prediction."
     J Comput Chem 26(10):1063-1068.
 """
+from __future__ import annotations
 
 import numpy as np
 from cotransfold.core.conformation import BackboneState
@@ -162,6 +163,58 @@ def get_ca_coords(coords: np.ndarray) -> np.ndarray:
         CA coordinates, shape (N, 3)
     """
     return coords[:, 1, :]
+
+
+CB_BOND_LENGTH = 1.52  # Å, CA-CB bond length
+
+
+def get_cb_coords(coords: np.ndarray, sequence: list | None = None) -> np.ndarray:
+    """Compute virtual Cβ positions from backbone N, CA, C atoms.
+
+    Cβ is placed at the tetrahedral position opposite the backbone,
+    1.52 Å from CA. GLY residues get Cβ at the CA position (dummy).
+
+    Args:
+        coords: shape (N, 3, 3) from torsion_to_cartesian
+        sequence: list of AminoAcid (optional, for GLY handling)
+
+    Returns:
+        Cβ coordinates, shape (N, 3)
+    """
+    n_atoms = coords[:, 0]   # (N, 3)
+    ca_atoms = coords[:, 1]  # (N, 3)
+    c_atoms = coords[:, 2]   # (N, 3)
+
+    # Vectors from CA to N and CA to C
+    n_vec = n_atoms - ca_atoms   # (N, 3)
+    c_vec = c_atoms - ca_atoms   # (N, 3)
+
+    # Normalize
+    n_len = np.linalg.norm(n_vec, axis=1, keepdims=True) + 1e-10
+    c_len = np.linalg.norm(c_vec, axis=1, keepdims=True) + 1e-10
+    n_hat = n_vec / n_len
+    c_hat = c_vec / c_len
+
+    # Cross product: normal to N-CA-C plane
+    cross = np.cross(n_vec, c_vec)
+    cross_len = np.linalg.norm(cross, axis=1, keepdims=True) + 1e-10
+    cross_hat = cross / cross_len
+
+    # Cβ direction: opposite to the bisector of N-CA and C-CA, tilted out of plane
+    cb_dir = -n_hat - c_hat + cross_hat
+    cb_len = np.linalg.norm(cb_dir, axis=1, keepdims=True) + 1e-10
+    cb_hat = cb_dir / cb_len
+
+    cb = ca_atoms + CB_BOND_LENGTH * cb_hat
+
+    # GLY: place Cβ at CA position
+    if sequence is not None:
+        from cotransfold.core.residue import AminoAcid
+        for i, aa in enumerate(sequence):
+            if aa == AminoAcid.GLY:
+                cb[i] = ca_atoms[i]
+
+    return cb
 
 
 def compute_distance(p1: np.ndarray, p2: np.ndarray) -> float:

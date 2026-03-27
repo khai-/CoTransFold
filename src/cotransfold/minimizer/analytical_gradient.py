@@ -25,8 +25,10 @@ import numpy as np
 
 from cotransfold.core.chain import NascentChain
 from cotransfold.core.conformation import BackboneState
-from cotransfold.structure.coordinates import torsion_to_cartesian, get_ca_coords
+from cotransfold.core.residue import RESIDUE_PROPERTIES
+from cotransfold.structure.coordinates import torsion_to_cartesian, get_ca_coords, get_cb_coords
 from cotransfold.energy.ramachandran import rama_probability, _get_regions
+from cotransfold.energy.vanderwaals import LJ_CUTOFF, CA_SIGMA, CA_EPSILON, CB_EPSILON, MIN_SEQ_SEP
 from cotransfold.config import BOLTZMANN_KCAL, DEFAULT_TEMPERATURE
 
 
@@ -73,27 +75,27 @@ def _rama_gradient(backbone: BackboneState, sequence: list,
 
 def _pairwise_ca_forces(ca: np.ndarray, n: int,
                         neighbor_list: np.ndarray | None = None) -> np.ndarray:
-    """Compute forces on CA atoms from VdW repulsion.
+    """Compute forces on CA atoms from full LJ potential.
 
-    With neighbor list: O(N * k) where k ~ 5-10 neighbors within cutoff.
-    Without: O(N²) full pairwise.
+    dE/dr = (12*eps/r) * [-(sigma/r)^12 + (sigma/r)^6]
 
     Returns: forces shape (N, 3)
     """
-    sigma = 3.8
-    eps = 0.05
+    sigma = CA_SIGMA
+    eps = CA_EPSILON
     forces = np.zeros((n, 3))
 
     if n < 4:
         return forces
 
     if neighbor_list is not None:
-        # Use precomputed neighbor list: list of (i, j) pairs
         for i, j in neighbor_list:
             diff = ca[i] - ca[j]
             r = np.linalg.norm(diff)
-            if r < sigma and r > 0.1:
-                de_dr = -12 * eps * (sigma / r)**12 / r
+            if r < LJ_CUTOFF and r > 0.1:
+                ratio = sigma / r
+                # Full LJ gradient: dE/dr = (12*eps/r)*[-(σ/r)^12 + (σ/r)^6]
+                de_dr = (12 * eps / r) * (-ratio**12 + ratio**6)
                 unit = diff / r
                 forces[i] += de_dr * unit
                 forces[j] -= de_dr * unit
@@ -105,13 +107,49 @@ def _pairwise_ca_forces(ca: np.ndarray, n: int,
 
     idx = np.arange(n)
     sep = np.abs(idx[:, None] - idx[None, :])
-    mask = (sep >= 3) & (dist < sigma)
+    mask = (sep >= MIN_SEQ_SEP) & (dist < LJ_CUTOFF)
 
     if not np.any(mask):
         return forces
 
     r_safe = np.maximum(dist, 0.1)
-    de_dr = np.where(mask, -12 * eps * (sigma / r_safe)**12 / r_safe, 0.0)
+    ratio = sigma / r_safe
+    # Full LJ gradient
+    de_dr = np.where(mask, (12 * eps / r_safe) * (-ratio**12 + ratio**6), 0.0)
+    unit = diff / (dist[:, :, None] + 1e-20)
+    forces = np.sum(de_dr[:, :, None] * unit, axis=1)
+    return forces
+
+
+def _pairwise_cb_forces(cb: np.ndarray, n: int,
+                        sequence: list) -> np.ndarray:
+    """Compute forces on Cβ atoms from LJ potential with residue-specific σ.
+
+    Returns: forces shape (N, 3)
+    """
+    forces = np.zeros((n, 3))
+
+    if n < 4:
+        return forces
+
+    # Per-residue VdW radii and pairwise sigma
+    radii = np.array([RESIDUE_PROPERTIES[aa].vdw_radius for aa in sequence])
+    sigma_ij = radii[:, None] + radii[None, :]  # (N, N)
+    valid_radii = sigma_ij > 1.0
+
+    diff = cb[:, None, :] - cb[None, :, :]
+    dist = np.linalg.norm(diff, axis=2) + 1e-20
+
+    idx = np.arange(n)
+    sep = np.abs(idx[:, None] - idx[None, :])
+    mask = (sep >= MIN_SEQ_SEP) & (dist < LJ_CUTOFF) & valid_radii
+
+    if not np.any(mask):
+        return forces
+
+    r_safe = np.maximum(dist, 0.1)
+    ratio = sigma_ij / r_safe
+    de_dr = np.where(mask, (12 * CB_EPSILON / r_safe) * (-ratio**12 + ratio**6), 0.0)
     unit = diff / (dist[:, :, None] + 1e-20)
     forces = np.sum(de_dr[:, :, None] * unit, axis=1)
     return forces
@@ -161,7 +199,7 @@ def _hbond_ca_forces(coords: np.ndarray, n: int) -> np.ndarray:
     return forces
 
 
-def build_neighbor_list(ca: np.ndarray, cutoff: float = 6.0,
+def build_neighbor_list(ca: np.ndarray, cutoff: float = 10.0,
                         min_seq_sep: int = 3) -> np.ndarray:
     """Build neighbor list of CA pairs within cutoff distance.
 
@@ -228,7 +266,7 @@ def compute_analytical_energy_and_gradient(
     if weights is None:
         weights = {}
     w_rama = weights.get('ramachandran', 1.0)
-    w_vdw = weights.get('vanderwaals', 0.5)
+    w_vdw = weights.get('vanderwaals', 1.0)
     w_hbond = weights.get('hbond', 1.0)
 
     n = chain.chain_length
@@ -243,10 +281,6 @@ def compute_analytical_energy_and_gradient(
     ca = coords[:, 1]  # (N, 3)
     kT = BOLTZMANN_KCAL * DEFAULT_TEMPERATURE
 
-    # === Forward pass: compute energy ===
-    # (We still use the TotalEnergy for the full energy value)
-    # The gradient is computed analytically below
-
     # === Backward pass: dE/d(angles) ===
 
     gradient = np.zeros(2 * n)
@@ -257,11 +291,15 @@ def compute_analytical_energy_and_gradient(
     gradient[1::2] += w_rama * dE_dpsi_rama
 
     # --- VdW + H-bond: force-based gradient ---
-    # Build neighbor list for VdW (rebuild every call; could cache)
-    nb_list = build_neighbor_list(ca, cutoff=6.0, min_seq_sep=3) if n >= 4 else None
+    nb_list = build_neighbor_list(ca, cutoff=LJ_CUTOFF, min_seq_sep=MIN_SEQ_SEP) if n >= 4 else None
     ca_forces = np.zeros((n, 3))
     ca_forces += w_vdw * _pairwise_ca_forces(ca, n, neighbor_list=nb_list)
     ca_forces += w_hbond * _hbond_ca_forces(coords, n)
+
+    # --- Cβ-Cβ forces (projected onto CA) ---
+    cb = get_cb_coords(coords, chain.sequence)
+    cb_forces = w_vdw * _pairwise_cb_forces(cb, n, chain.sequence)
+    ca_forces += cb_forces  # Approximate: Cβ rigidly attached to CA
 
     # Convert CA forces to torsion angle gradients using chain rule:
     # dE/d(angle_k) = sum_{j>=k} force_j · (axis_k × (CA_j - pivot_k))

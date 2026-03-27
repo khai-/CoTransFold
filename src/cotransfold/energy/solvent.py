@@ -23,7 +23,7 @@ import numpy as np
 from cotransfold.core.conformation import BackboneState
 from cotransfold.core.residue import AminoAcid, RESIDUE_PROPERTIES
 from cotransfold.energy.total import EnergyTerm
-from cotransfold.structure.coordinates import get_ca_coords
+from cotransfold.structure.coordinates import get_cb_coords
 
 # Solvation parameters (kcal/mol) — positive means cost of solvent exposure
 # Hydrophobic residues have high solvation cost (want to be buried)
@@ -74,7 +74,7 @@ class SolventEnergy(EnergyTerm):
         if n < 2:
             return 0.0
 
-        ca = get_ca_coords(coords)  # (N, 3)
+        cb = get_cb_coords(coords, sequence)  # (N, 3)
         tunnel_positions = kwargs.get('tunnel_positions')
         tunnel_length = kwargs.get('tunnel_length', 90.0)
 
@@ -87,8 +87,8 @@ class SolventEnergy(EnergyTerm):
         if not np.any(exposed_mask):
             return 0.0
 
-        # Pairwise CA distance matrix
-        diff = ca[:, None, :] - ca[None, :, :]  # (N, N, 3)
+        # Pairwise Cβ distance matrix (better represents sidechain burial)
+        diff = cb[:, None, :] - cb[None, :, :]  # (N, N, 3)
         dist = np.linalg.norm(diff, axis=2)      # (N, N)
         np.fill_diagonal(dist, BURIAL_CUTOFF + 1)  # Exclude self
 

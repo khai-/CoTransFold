@@ -61,10 +61,10 @@ class SimulationConfig:
     # Energy term weights
     w_ramachandran: float = 1.0
     w_hbond: float = 1.0
-    w_vanderwaals: float = 0.5
+    w_vanderwaals: float = 1.0
     w_bonded: float = 0.5
     w_tunnel: float = 1.0
-    w_solvent: float = 0.5
+    w_solvent: float = 1.0
 
     # Tunnel energy parameters
     tunnel_wall_spring: float = 5.0

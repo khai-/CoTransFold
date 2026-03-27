@@ -1,9 +1,9 @@
-"""Van der Waals / steric repulsion energy (vectorized).
+"""Van der Waals energy with full Lennard-Jones potential (vectorized).
 
-E_vdw = sum_{i<j, |i-j|>2} epsilon * (sigma/r_ij)^12
+E_LJ = sum_{i<j, |i-j|>2} epsilon * [(sigma/r_ij)^12 - 2*(sigma/r_ij)^6]
 
-Only the repulsive r^-12 term is used (no attractive r^-6).
-Excluded: residue pairs within 2 positions in sequence.
+Includes both CA-CA backbone interactions and Cβ-Cβ sidechain interactions
+with residue-specific van der Waals radii.
 """
 
 from __future__ import annotations
@@ -11,21 +11,26 @@ from __future__ import annotations
 import numpy as np
 
 from cotransfold.core.conformation import BackboneState
+from cotransfold.core.residue import AminoAcid, RESIDUE_PROPERTIES
 from cotransfold.energy.total import EnergyTerm
-from cotransfold.structure.coordinates import get_ca_coords
+from cotransfold.structure.coordinates import get_ca_coords, get_cb_coords
 
-# Parameters for CA-CA repulsive potential
+# Parameters for CA-CA LJ potential
 CA_SIGMA = 3.8      # Å, equilibrium CA-CA distance
-CA_EPSILON = 0.05   # kcal/mol, repulsion strength
+CA_EPSILON = 0.05   # kcal/mol
 MIN_SEQ_SEP = 3     # Skip bonded neighbors (i,i+1) and (i,i+2)
+LJ_CUTOFF = 10.0    # Å, beyond which LJ is negligible
 
 # For all-atom backbone: N, CA, C atoms
 BACKBONE_SIGMA = 2.8    # Å, minimum approach distance for backbone heavy atoms
 BACKBONE_EPSILON = 0.10  # kcal/mol
 
+# Cβ-Cβ interaction parameters
+CB_EPSILON = 0.03   # kcal/mol, sidechain interaction strength
+
 
 class VanDerWaalsEnergy(EnergyTerm):
-    """Steric repulsion between backbone atoms (vectorized)."""
+    """Lennard-Jones potential between backbone and sidechain atoms."""
 
     def __init__(self, use_all_atoms: bool = False) -> None:
         self._use_all_atoms = use_all_atoms
@@ -41,28 +46,61 @@ class VanDerWaalsEnergy(EnergyTerm):
             return 0.0
 
         if self._use_all_atoms:
-            return self._compute_all_atoms(coords, n)
+            e_bb = self._compute_all_atoms(coords, n)
         else:
-            return self._compute_ca_only(coords, n)
+            e_bb = self._compute_ca_only(coords, n)
+
+        e_cb = self._compute_cb_interactions(coords, n, sequence)
+        return e_bb + e_cb
 
     def _compute_ca_only(self, coords: np.ndarray, n: int) -> float:
-        """CA-CA repulsive potential (vectorized)."""
+        """CA-CA full Lennard-Jones potential (vectorized)."""
         ca = get_ca_coords(coords)  # (N, 3)
 
         # Pairwise distance matrix
         diff = ca[:, None, :] - ca[None, :, :]  # (N, N, 3)
         dist = np.linalg.norm(diff, axis=2)      # (N, N)
 
-        # Upper triangle mask with sequence separation
+        # Upper triangle mask with sequence separation and cutoff
         ii, jj = np.meshgrid(np.arange(n), np.arange(n), indexing='ij')
-        mask = (jj > ii) & ((jj - ii) >= MIN_SEQ_SEP) & (dist < CA_SIGMA)
+        mask = (jj > ii) & ((jj - ii) >= MIN_SEQ_SEP) & (dist < LJ_CUTOFF)
 
         if not np.any(mask):
             return 0.0
 
         r = np.maximum(dist[mask], 0.1)
         ratios = CA_SIGMA / r
-        return float(np.sum(CA_EPSILON * ratios ** 12))
+        # Full LJ: ε[(σ/r)¹² - 2(σ/r)⁶], minimum at r=σ with depth -ε
+        return float(np.sum(CA_EPSILON * (ratios ** 12 - 2.0 * ratios ** 6)))
+
+    def _compute_cb_interactions(self, coords: np.ndarray, n: int,
+                                 sequence: list) -> float:
+        """Cβ-Cβ LJ potential with residue-specific radii (vectorized)."""
+        cb = get_cb_coords(coords, sequence)  # (N, 3)
+
+        # Per-residue VdW radii
+        radii = np.array([RESIDUE_PROPERTIES[aa].vdw_radius for aa in sequence])
+
+        # Pairwise sigma: sum of radii
+        sigma_ij = radii[:, None] + radii[None, :]  # (N, N)
+
+        # Skip pairs involving GLY (vdw_radius=0) or where sigma is too small
+        valid_radii = sigma_ij > 1.0
+
+        # Pairwise distances
+        diff = cb[:, None, :] - cb[None, :, :]  # (N, N, 3)
+        dist = np.linalg.norm(diff, axis=2)      # (N, N)
+
+        ii, jj = np.meshgrid(np.arange(n), np.arange(n), indexing='ij')
+        mask = (jj > ii) & ((jj - ii) >= MIN_SEQ_SEP) & (dist < LJ_CUTOFF) & valid_radii
+
+        if not np.any(mask):
+            return 0.0
+
+        r = np.maximum(dist[mask], 0.1)
+        sig = sigma_ij[mask]
+        ratios = sig / r
+        return float(np.sum(CB_EPSILON * (ratios ** 12 - 2.0 * ratios ** 6)))
 
     def _compute_all_atoms(self, coords: np.ndarray, n: int) -> float:
         """All backbone atom repulsive potential (vectorized)."""
