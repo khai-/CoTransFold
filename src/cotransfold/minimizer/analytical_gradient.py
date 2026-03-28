@@ -156,10 +156,10 @@ def _pairwise_cb_forces(cb: np.ndarray, n: int,
 
 
 def _hbond_ca_forces(coords: np.ndarray, n: int) -> np.ndarray:
-    """H-bond force on CA atoms using vectorized local window.
+    """H-bond force on CA atoms — full pairwise O-N computation.
 
-    Only checks i→i+3 through i→i+7 (covers alpha-helix i→i+4 and 3_10 helix i→i+3).
-    O(N) since window size is constant.
+    Covers both local helix-forming H-bonds (i→i+3, i→i+4) and long-range
+    beta-sheet H-bonds. Uses vectorized pairwise distance matrix.
 
     Returns: forces shape (N, 3)
     """
@@ -185,33 +185,33 @@ def _hbond_ca_forces(coords: np.ndarray, n: int) -> np.ndarray:
         bis_n = np.maximum(bis_n, 1e-10)
         o_pos[:n-1] = c_pos[:n-1] + 1.24 * bisector / bis_n
 
-    # Check H-bond pairs in a local window (±7 residues)
-    for offset in range(3, 8):
-        if offset >= n:
-            break
-        n_acc = min(n - offset, n - 1)  # exclude last residue as acceptor (no valid O)
-        if n_acc <= 0:
-            continue
+    # Full pairwise O-N distance matrix
+    # Acceptor: O of residue i (valid for i < n-1)
+    # Donor: N of residue j (valid for j > 0)
+    diff = o_pos[:, None, :] - n_pos[None, :, :]  # (N, N, 3)
+    dist = np.linalg.norm(diff, axis=2)  # (N, N)
 
-        # Acceptor: O of residue i, Donor: N of residue i+offset
-        o_acc = o_pos[:n_acc]
-        n_don = n_pos[offset:offset + n_acc]
+    # Mask: valid acceptor (i < n-1), valid donor (j > 0), seq_sep >= 3, distance < 5.2
+    idx = np.arange(n)
+    sep = np.abs(idx[:, None] - idx[None, :])
+    mask = (idx[:, None] < n - 1) & (idx[None, :] > 0) & (sep >= 3) & (dist < 5.2)
 
-        diff = o_acc - n_don
-        dist = np.linalg.norm(diff, axis=1)
+    if not np.any(mask):
+        return forces
 
-        close = dist < 5.2
-        if not np.any(close):
-            continue
+    # Strength: stronger for local helix-forming (sep 3-4), moderate for others
+    base_strength = np.where(sep <= 4, 0.8, 0.6)
+    strength = base_strength * np.maximum(0, (5.2 - dist) / 5.2)
+    strength = np.where(mask, strength, 0.0)
 
-        direction = diff / (dist[:, None] + 1e-10)
-        strength = 0.6 * np.maximum(0, (5.2 - dist) / 5.2)
+    direction = diff / (dist[:, :, None] + 1e-10)
 
-        for k in range(n_acc):
-            if close[k]:
-                f = strength[k] * direction[k]
-                forces[offset + k] += f  # Pull donor toward acceptor
-                forces[k] -= f
+    # Force on each atom: sum over all H-bond partners
+    # Acceptor i pulls donor j: force on j (donor) = +strength * direction
+    # Reaction on i (acceptor) = -strength * direction
+    weighted_dir = strength[:, :, None] * direction  # (N, N, 3)
+    forces += np.sum(weighted_dir, axis=0)   # force on donors (sum over acceptors)
+    forces -= np.sum(weighted_dir, axis=1)   # reaction on acceptors (sum over donors)
 
     return forces
 
