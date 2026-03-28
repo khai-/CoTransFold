@@ -28,6 +28,8 @@ from cotransfold.energy.vanderwaals import VanDerWaalsEnergy
 from cotransfold.energy.bonded import BondedEnergy
 from cotransfold.energy.tunnel_energy import TunnelEnergy
 from cotransfold.energy.solvent import SolventEnergy
+from cotransfold.energy.rg_restraint import RgRestraintEnergy
+from cotransfold.energy.torsion_coupling import TorsionCouplingEnergy
 from cotransfold.tunnel.geometry import TunnelGeometry
 from cotransfold.tunnel.electrostatics import TunnelElectrostatics
 from cotransfold.tunnel.organisms import get_tunnel
@@ -65,6 +67,8 @@ class SimulationConfig:
     w_bonded: float = 0.5
     w_tunnel: float = 1.0
     w_solvent: float = 1.3
+    w_rg: float = 1.0
+    w_torsion_coupling: float = 0.5
 
     # Tunnel energy parameters
     tunnel_wall_spring: float = 5.0
@@ -78,7 +82,7 @@ class SimulationConfig:
     annealing_t_end: float = 0.05
 
     # Multi-start equilibration
-    n_restarts: int = 3
+    n_restarts: int = 10
 
     # Minimizer parameters
     minimizer: str = 'numpy'            # 'jax' (autodiff) or 'numpy' (finite differences)
@@ -131,6 +135,9 @@ class SimulationEngine:
         if cfg.use_solvent:
             self._energy.add_term(SolventEnergy(), cfg.w_solvent)
 
+        self._energy.add_term(RgRestraintEnergy(), cfg.w_rg)
+        self._energy.add_term(TorsionCouplingEnergy(), cfg.w_torsion_coupling)
+
         # Chaperone program
         self._chaperone_program = None
         if cfg.use_chaperones:
@@ -146,6 +153,8 @@ class SimulationEngine:
             'bonded': cfg.w_bonded,
             'solvent': cfg.w_solvent if cfg.use_solvent else 0.0,
             'tunnel': cfg.w_tunnel if cfg.use_tunnel else 0.0,
+            'rg_restraint': cfg.w_rg,
+            'torsion_coupling': cfg.w_torsion_coupling,
         }
         if self._use_jax:
             from cotransfold.minimizer.jax_minimizer import JaxMinimizer

@@ -29,6 +29,8 @@ from cotransfold.core.residue import RESIDUE_PROPERTIES
 from cotransfold.structure.coordinates import torsion_to_cartesian, get_ca_coords, get_cb_coords
 from cotransfold.energy.ramachandran import rama_probability, _get_regions
 from cotransfold.energy.vanderwaals import LJ_CUTOFF, CA_SIGMA, CA_EPSILON, CB_EPSILON, MIN_SEQ_SEP
+from cotransfold.energy.solvent import SOLVATION_PARAMS, BURIAL_CUTOFF, MAX_NEIGHBORS
+from cotransfold.energy.rg_restraint import expected_rg, compute_rg
 from cotransfold.config import BOLTZMANN_KCAL, DEFAULT_TEMPERATURE
 
 
@@ -216,6 +218,72 @@ def _hbond_ca_forces(coords: np.ndarray, n: int) -> np.ndarray:
     return forces
 
 
+def _rg_ca_forces(ca: np.ndarray, n: int) -> np.ndarray:
+    """Force on CA atoms from radius of gyration restraint.
+
+    E_rg = (Rg - Rg_expected)^2
+    dE/d(pos_j) = 2*(Rg - Rg_expected) * d(Rg)/d(pos_j)
+    d(Rg)/d(pos_j) = (pos_j - centroid) / (N * Rg)
+
+    Returns: forces shape (N, 3)
+    """
+    if n < 5:
+        return np.zeros((n, 3))
+
+    centroid = ca.mean(axis=0)
+    disp = ca - centroid  # (N, 3)
+    rg = np.sqrt(np.mean(np.sum(disp ** 2, axis=1)))
+    rg_exp = expected_rg(n)
+
+    if rg < 1e-10:
+        return np.zeros((n, 3))
+
+    # dE/d(pos_j) = 2*(Rg - Rg_exp) * (pos_j - centroid) / (N * Rg)
+    factor = 2.0 * (rg - rg_exp) / (n * rg)
+    forces = factor * disp
+    return forces
+
+
+def _solvent_cb_forces(cb: np.ndarray, n: int, sequence: list) -> np.ndarray:
+    """Force on Cβ atoms from solvent energy.
+
+    E_solvent = sum_i sigma_i * max(0, 1 - neighbors_i / MAX_NEIGHBORS)
+    Gradient: moving Cβ_j closer to Cβ_i increases burial of both →
+    decreases exposure → lowers energy for hydrophobic residues.
+
+    Returns: forces shape (N, 3) — projected onto CA.
+    """
+    forces = np.zeros((n, 3))
+    if n < 2:
+        return forces
+
+    sigma = np.array([SOLVATION_PARAMS.get(aa, 0.0) for aa in sequence])
+
+    diff = cb[:, None, :] - cb[None, :, :]  # (N, N, 3)
+    dist = np.linalg.norm(diff, axis=2) + 1e-20  # (N, N)
+
+    # For pairs near the burial cutoff, there's a force
+    # When a neighbor enters/exits the cutoff sphere, exposure changes discretely.
+    # Use a soft switching function instead: smooth_count = sum sigmoid((cutoff - r) / width)
+    width = 1.0  # Å, switching width
+    switch = 1.0 / (1.0 + np.exp((dist - BURIAL_CUTOFF) / width))  # (N, N)
+    np.fill_diagonal(switch, 0.0)
+
+    # d(switch_ij)/d(r_ij) = -switch*(1-switch)/width
+    d_switch_dr = -switch * (1.0 - switch) / width  # (N, N)
+
+    # d(exposure_i)/d(r_ij) = -d_switch_ij / MAX_NEIGHBORS
+    # d(E)/d(r_ij) = sigma_i * d(exposure_i)/d(r_ij) + sigma_j * d(exposure_j)/d(r_ij)
+    # = -(sigma_i + sigma_j) * d_switch_dr / MAX_NEIGHBORS
+
+    de_dr = -(sigma[:, None] + sigma[None, :]) * d_switch_dr / MAX_NEIGHBORS  # (N, N)
+
+    # Convert to force vectors
+    unit = diff / (dist[:, :, None] + 1e-20)
+    forces = np.sum(de_dr[:, :, None] * unit, axis=1)
+    return forces
+
+
 def build_neighbor_list(ca: np.ndarray, cutoff: float = 10.0,
                         min_seq_sep: int = 3) -> np.ndarray:
     """Build neighbor list of CA pairs within cutoff distance.
@@ -285,6 +353,8 @@ def compute_analytical_energy_and_gradient(
     w_rama = weights.get('ramachandran', 1.0)
     w_vdw = weights.get('vanderwaals', 0.7)
     w_hbond = weights.get('hbond', 1.3)
+    w_solvent = weights.get('solvent', 1.3)
+    w_rg = weights.get('rg_restraint', 1.0)
 
     n = chain.chain_length
     if n == 0:
@@ -317,6 +387,12 @@ def compute_analytical_energy_and_gradient(
     cb = get_cb_coords(coords, chain.sequence)
     cb_forces = w_vdw * _pairwise_cb_forces(cb, n, chain.sequence)
     ca_forces += cb_forces  # Approximate: Cβ rigidly attached to CA
+
+    # --- Rg restraint forces ---
+    ca_forces += w_rg * _rg_ca_forces(ca, n)
+
+    # --- Solvent forces (on Cβ, projected to CA) ---
+    ca_forces += w_solvent * _solvent_cb_forces(cb, n, chain.sequence)
 
     # Convert CA forces to torsion angle gradients using chain rule:
     # dE/d(angle_k) = sum_{j>=k} force_j · (axis_k × (CA_j - pivot_k))
