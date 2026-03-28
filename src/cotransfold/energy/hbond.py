@@ -146,4 +146,32 @@ class HydrogenBondEnergy(EnergyTerm):
         # Only count attractive (negative) energies
         energies = np.minimum(energies, 0.0)
 
+        # Cooperative enhancement: consecutive helical H-bonds (i→i+4)
+        # are up to 2x stronger than isolated ones
+        is_helical = (don_idx - acc_idx == 4)
+        has_helical_hbond = np.zeros(n, dtype=bool)
+        for k in range(len(acc_idx)):
+            if is_helical[k] and energies[k] < HBOND_CUTOFF:
+                has_helical_hbond[acc_idx[k]] = True
+
+        for k in range(len(acc_idx)):
+            if not is_helical[k] or energies[k] >= 0:
+                continue
+            # Count consecutive helical H-bonds around this acceptor
+            pos = acc_idx[k]
+            n_consec = 0
+            for offset in range(1, 4):
+                if pos - offset >= 0 and has_helical_hbond[pos - offset]:
+                    n_consec += 1
+                else:
+                    break
+            for offset in range(1, 4):
+                if pos + offset < n and has_helical_hbond[pos + offset]:
+                    n_consec += 1
+                else:
+                    break
+            # Enhancement: 1.0 (isolated) to 2.0 (in long helix)
+            coop_factor = 1.0 + min(n_consec, 5) * 0.2
+            energies[k] *= coop_factor
+
         return float(np.sum(energies))
