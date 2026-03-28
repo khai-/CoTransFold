@@ -30,6 +30,8 @@ from cotransfold.energy.tunnel_energy import TunnelEnergy
 from cotransfold.energy.solvent import SolventEnergy
 from cotransfold.energy.rg_restraint import RgRestraintEnergy
 from cotransfold.energy.torsion_coupling import TorsionCouplingEnergy
+from cotransfold.energy.pair_potential import PairPotentialEnergy
+from cotransfold.energy.sheet_pairing import SheetPairingEnergy
 from cotransfold.tunnel.geometry import TunnelGeometry
 from cotransfold.tunnel.electrostatics import TunnelElectrostatics
 from cotransfold.tunnel.organisms import get_tunnel
@@ -69,6 +71,8 @@ class SimulationConfig:
     w_solvent: float = 1.3
     w_rg: float = 1.0
     w_torsion_coupling: float = 0.5
+    w_pair_potential: float = 0.3
+    w_sheet_pairing: float = 0.3
 
     # Tunnel energy parameters
     tunnel_wall_spring: float = 5.0
@@ -137,6 +141,8 @@ class SimulationEngine:
 
         self._energy.add_term(RgRestraintEnergy(), cfg.w_rg)
         self._energy.add_term(TorsionCouplingEnergy(), cfg.w_torsion_coupling)
+        self._energy.add_term(PairPotentialEnergy(), cfg.w_pair_potential)
+        self._energy.add_term(SheetPairingEnergy(), cfg.w_sheet_pairing)
 
         # Chaperone program
         self._chaperone_program = None

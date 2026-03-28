@@ -161,7 +161,8 @@ def _hbond_ca_forces(coords: np.ndarray, n: int) -> np.ndarray:
     """H-bond force on CA atoms — full pairwise O-N computation.
 
     Covers both local helix-forming H-bonds (i→i+3, i→i+4) and long-range
-    beta-sheet H-bonds. Uses vectorized pairwise distance matrix.
+    beta-sheet H-bonds. Uses vectorized pairwise distance matrix with
+    virtual O atom positions matching the DSSP energy model.
 
     Returns: forces shape (N, 3)
     """
@@ -188,8 +189,6 @@ def _hbond_ca_forces(coords: np.ndarray, n: int) -> np.ndarray:
         o_pos[:n-1] = c_pos[:n-1] + 1.24 * bisector / bis_n
 
     # Full pairwise O-N distance matrix
-    # Acceptor: O of residue i (valid for i < n-1)
-    # Donor: N of residue j (valid for j > 0)
     diff = o_pos[:, None, :] - n_pos[None, :, :]  # (N, N, 3)
     dist = np.linalg.norm(diff, axis=2)  # (N, N)
 
@@ -209,8 +208,6 @@ def _hbond_ca_forces(coords: np.ndarray, n: int) -> np.ndarray:
     direction = diff / (dist[:, :, None] + 1e-10)
 
     # Force on each atom: sum over all H-bond partners
-    # Acceptor i pulls donor j: force on j (donor) = +strength * direction
-    # Reaction on i (acceptor) = -strength * direction
     weighted_dir = strength[:, :, None] * direction  # (N, N, 3)
     forces += np.sum(weighted_dir, axis=0)   # force on donors (sum over acceptors)
     forces -= np.sum(weighted_dir, axis=1)   # reaction on acceptors (sum over donors)
