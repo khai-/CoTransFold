@@ -36,6 +36,8 @@ from cotransfold.tunnel.geometry import TunnelGeometry
 from cotransfold.tunnel.electrostatics import TunnelElectrostatics
 from cotransfold.tunnel.organisms import get_tunnel
 from cotransfold.kinetics.translation import TranslationSchedule
+from cotransfold.sampling.fragments import FragmentLibrary
+from cotransfold.sampling.remc import run_remc
 from cotransfold.chaperones.program import ChaperoneProgram
 from cotransfold.minimizer.gradient import GradientMinimizer
 from cotransfold.structure.coordinates import torsion_to_cartesian
@@ -87,6 +89,14 @@ class SimulationConfig:
 
     # Multi-start equilibration
     n_restarts: int = 10
+
+    # REMC sampling (replaces annealing + multi-start when enabled)
+    use_remc: bool = True
+    remc_replicas: int = 8
+    remc_cycles: int = 100
+    remc_mc_steps: int = 30
+    remc_t_low: float = 0.5
+    remc_t_high: float = 5.0
 
     # Minimizer parameters
     minimizer: str = 'numpy'            # 'jax' (autodiff) or 'numpy' (finite differences)
@@ -373,10 +383,32 @@ class SimulationEngine:
                     )
 
             # Seed RNG for deterministic results from same sequence
-            np.random.seed(hash(tuple(aa_seq)) % (2**31))
+            seq_seed = hash(tuple(aa_seq)) % (2**31)
+            np.random.seed(seq_seed)
 
-            # --- Simulated annealing ---
-            if cfg.use_annealing and cfg.annealing_stages > 1:
+            # --- REMC sampling (preferred over SA + multi-start) ---
+            if cfg.use_remc:
+                frag_lib = FragmentLibrary(aa_seq, n_frags=200, seed=seq_seed)
+                best_bb = run_remc(
+                    chain, self._energy, frag_lib,
+                    n_replicas=cfg.remc_replicas,
+                    n_cycles=cfg.remc_cycles,
+                    mc_steps_per_cycle=cfg.remc_mc_steps,
+                    t_low=cfg.remc_t_low,
+                    t_high=cfg.remc_t_high,
+                    energy_kwargs=eq_kwargs,
+                    seed=seq_seed,
+                )
+                # Apply best structure
+                chain.backbone.phi[:] = best_bb.phi
+                chain.backbone.psi[:] = best_bb.psi
+                chain.backbone.omega[:] = best_bb.omega
+
+                # Final deep minimization to relax REMC result
+                _minimize_eq(cfg.equilibration_steps)
+
+            # --- Simulated annealing (fallback when REMC disabled) ---
+            elif cfg.use_annealing and cfg.annealing_stages > 1:
                 steps_per_stage = cfg.equilibration_steps // cfg.annealing_stages
                 t_start = cfg.annealing_t_start
                 t_end = cfg.annealing_t_end
@@ -428,8 +460,8 @@ class SimulationEngine:
                 # No annealing — single minimization
                 _minimize_eq(cfg.equilibration_steps)
 
-            # --- Multi-start ---
-            if cfg.n_restarts > 0:
+            # --- Multi-start (skipped when REMC is active) ---
+            if cfg.n_restarts > 0 and not cfg.use_remc:
                 best_energy = self._energy.compute(chain, **eq_kwargs)
                 best_backbone = chain.backbone.copy()
                 restart_steps = cfg.equilibration_steps // max(cfg.n_restarts, 1)
