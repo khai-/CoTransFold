@@ -92,9 +92,10 @@ class SimulationConfig:
 
     # REMC sampling (replaces annealing + multi-start when enabled)
     use_remc: bool = True
-    remc_replicas: int = 8
-    remc_cycles: int = 100
-    remc_mc_steps: int = 30
+    remc_replicas: int = 12
+    remc_cycles: int = 150
+    remc_mc_steps: int = 0       # 0 = auto-scale by sqrt(N)
+    remc_independent_runs: int = 2
     remc_t_low: float = 0.5
     remc_t_high: float = 5.0
 
@@ -389,22 +390,45 @@ class SimulationEngine:
             # --- REMC sampling (preferred over SA + multi-start) ---
             if cfg.use_remc:
                 frag_lib = FragmentLibrary(aa_seq, n_frags=200, seed=seq_seed)
-                best_bb = run_remc(
-                    chain, self._energy, frag_lib,
-                    n_replicas=cfg.remc_replicas,
-                    n_cycles=cfg.remc_cycles,
-                    mc_steps_per_cycle=cfg.remc_mc_steps,
-                    t_low=cfg.remc_t_low,
-                    t_high=cfg.remc_t_high,
-                    energy_kwargs=eq_kwargs,
-                    seed=seq_seed,
-                )
-                # Apply best structure
-                chain.backbone.phi[:] = best_bb.phi
-                chain.backbone.psi[:] = best_bb.psi
-                chain.backbone.omega[:] = best_bb.omega
 
-                # Final deep minimization to relax REMC result
+                # Auto-scale MC steps by chain length
+                mc_steps = cfg.remc_mc_steps
+                if mc_steps == 0:
+                    mc_steps = max(10, int(30 * np.sqrt(n_res) / 8))
+
+                # Multiple independent REMC runs — keep best
+                best_run_energy = float('inf')
+                best_run_bb = chain.backbone.copy()
+
+                for run_idx in range(cfg.remc_independent_runs):
+                    run_seed = seq_seed + run_idx * 12345
+                    bb = run_remc(
+                        chain, self._energy, frag_lib,
+                        n_replicas=cfg.remc_replicas,
+                        n_cycles=cfg.remc_cycles,
+                        mc_steps_per_cycle=mc_steps,
+                        t_low=cfg.remc_t_low,
+                        t_high=cfg.remc_t_high,
+                        energy_kwargs=eq_kwargs,
+                        seed=run_seed,
+                    )
+
+                    # Evaluate this run's result
+                    chain.backbone.phi[:] = bb.phi
+                    chain.backbone.psi[:] = bb.psi
+                    chain.backbone.omega[:] = bb.omega
+                    run_energy = self._energy.compute(chain, **eq_kwargs)
+
+                    if run_energy < best_run_energy:
+                        best_run_energy = run_energy
+                        best_run_bb = bb.copy()
+
+                # Apply best across all runs
+                chain.backbone.phi[:] = best_run_bb.phi
+                chain.backbone.psi[:] = best_run_bb.psi
+                chain.backbone.omega[:] = best_run_bb.omega
+
+                # Final deep minimization with exact numerical gradient
                 _minimize_eq(cfg.equilibration_steps)
 
             # --- Simulated annealing (fallback when REMC disabled) ---
