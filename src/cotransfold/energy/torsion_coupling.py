@@ -1,12 +1,21 @@
-"""Torsion angle coupling energy — correlates adjacent backbone angles.
+"""Multibody torsion correlation energy (inspired by UNRES U_corr).
 
-Penalizes adjacent (phi_i, psi_i) → (phi_i+1, psi_i+1) combinations that
-are unlikely in real proteins. This helps stabilize secondary structure
-by enforcing that consecutive residues adopt compatible conformations.
+Captures the coupling between backbone torsion angles and electrostatic
+interactions that stabilizes secondary structure cooperatively. This is
+a 3-4 body term that cannot be decomposed into pairwise interactions.
 
-Uses a simplified model: penalizes large differences in psi_i vs phi_{i+1}
-(the omega-adjacent torsion pair) since these are geometrically coupled.
-Also rewards consistent secondary structure runs (helix-helix, strand-strand).
+Key physics: consecutive residues in helical conformation create aligned
+backbone dipoles whose interaction reinforces the helical state. Similarly,
+consecutive strand residues create cooperative sheet stabilization.
+
+Three components:
+1. Pairwise torsion consistency (original): rewards consecutive SS
+2. Three-body dipole-torsion coupling: helix dipole alignment enhances
+   helical torsion preference
+3. Four-body turn correlation: rewards proper turn patterns between
+   SS elements
+
+Reference: Liwo et al., UNRES cumulant-based multibody terms
 """
 
 from __future__ import annotations
@@ -16,22 +25,45 @@ import numpy as np
 from cotransfold.core.conformation import BackboneState
 from cotransfold.energy.total import EnergyTerm
 
-
-# Ideal angle pairs for secondary structure
-HELIX_PHI = np.radians(-57.0)
-HELIX_PSI = np.radians(-47.0)
+# Ideal torsion angles
+HELIX_PHI = np.radians(-63.0)
+HELIX_PSI = np.radians(-42.0)
 STRAND_PHI = np.radians(-120.0)
-STRAND_PSI = np.radians(120.0)
+STRAND_PSI = np.radians(130.0)
+TURN_PHI_1 = np.radians(-60.0)
+TURN_PSI_1 = np.radians(-30.0)
+TURN_PHI_2 = np.radians(-90.0)
+TURN_PSI_2 = np.radians(0.0)
 
 
-def _angle_diff(a: float, b: float) -> float:
-    """Smallest signed difference between two angles (radians)."""
+def _angle_diff(a, b):
+    """Smallest signed angular difference (vectorized)."""
     d = a - b
     return d - 2 * np.pi * np.round(d / (2 * np.pi))
 
 
+def _ss_membership(phi, psi):
+    """Compute soft membership in helix/strand/turn states.
+
+    Returns (helix_score, strand_score, turn_score) each in [0, 1].
+    """
+    # Helix membership
+    d_h = (_angle_diff(phi, HELIX_PHI) ** 2 + _angle_diff(psi, HELIX_PSI) ** 2)
+    helix = np.exp(-d_h / (2 * np.radians(20) ** 2))
+
+    # Strand membership
+    d_s = (_angle_diff(phi, STRAND_PHI) ** 2 + _angle_diff(psi, STRAND_PSI) ** 2)
+    strand = np.exp(-d_s / (2 * np.radians(25) ** 2))
+
+    # Turn membership (type I turn, position i+1)
+    d_t = (_angle_diff(phi, TURN_PHI_1) ** 2 + _angle_diff(psi, TURN_PSI_1) ** 2)
+    turn = np.exp(-d_t / (2 * np.radians(25) ** 2))
+
+    return helix, strand, turn
+
+
 class TorsionCouplingEnergy(EnergyTerm):
-    """Reward consecutive residues that adopt consistent secondary structure."""
+    """Multibody torsion correlation with dipole-torsion coupling."""
 
     @property
     def name(self) -> str:
@@ -46,32 +78,48 @@ class TorsionCouplingEnergy(EnergyTerm):
         phi = backbone.phi
         psi = backbone.psi
 
+        # Compute SS membership for all residues
+        h, s, t = _ss_membership(phi, psi)
+
         energy = 0.0
 
+        # --- Component 1: Pairwise torsion consistency ---
+        # Reward consecutive residues in same SS state
         for i in range(n - 1):
-            # Check if residue i and i+1 are both near helix angles
-            d_phi_h_i = _angle_diff(phi[i], HELIX_PHI)
-            d_psi_h_i = _angle_diff(psi[i], HELIX_PSI)
-            d_phi_h_j = _angle_diff(phi[i + 1], HELIX_PHI)
-            d_psi_h_j = _angle_diff(psi[i + 1], HELIX_PSI)
+            # Helix-helix pair
+            energy -= 0.4 * h[i] * h[i + 1]
+            # Strand-strand pair
+            energy -= 0.3 * s[i] * s[i + 1]
 
-            helix_i = (d_phi_h_i ** 2 + d_psi_h_i ** 2) / (np.radians(30) ** 2)
-            helix_j = (d_phi_h_j ** 2 + d_psi_h_j ** 2) / (np.radians(30) ** 2)
+        # --- Component 2: Three-body helix cooperativity ---
+        # Three consecutive helical residues are more than 3x as stable
+        # as three independent helical residues (cooperative enhancement)
+        for i in range(n - 2):
+            helix_triple = h[i] * h[i + 1] * h[i + 2]
+            energy -= 0.5 * helix_triple  # Extra cooperative bonus
 
-            # Check if both near strand angles
-            d_phi_s_i = _angle_diff(phi[i], STRAND_PHI)
-            d_psi_s_i = _angle_diff(psi[i], STRAND_PSI)
-            d_phi_s_j = _angle_diff(phi[i + 1], STRAND_PHI)
-            d_psi_s_j = _angle_diff(psi[i + 1], STRAND_PSI)
+            strand_triple = s[i] * s[i + 1] * s[i + 2]
+            energy -= 0.3 * strand_triple
 
-            strand_i = (d_phi_s_i ** 2 + d_psi_s_i ** 2) / (np.radians(30) ** 2)
-            strand_j = (d_phi_s_j ** 2 + d_psi_s_j ** 2) / (np.radians(30) ** 2)
+        # --- Component 3: Four-body helix nucleation ---
+        # Four consecutive helix residues = nucleation threshold
+        # Strong cooperative bonus for nucleation
+        for i in range(n - 3):
+            helix_quad = h[i] * h[i + 1] * h[i + 2] * h[i + 3]
+            energy -= 0.8 * helix_quad  # Strong nucleation bonus
 
-            # Reward: both in helix OR both in strand (Gaussian-like)
-            helix_pair = np.exp(-0.5 * (helix_i + helix_j))
-            strand_pair = np.exp(-0.5 * (strand_i + strand_j))
+        # --- Component 4: Turn patterns ---
+        # Reward helix-turn-helix and strand-turn-strand motifs
+        for i in range(n - 4):
+            # Helix-turn-helix: H H T H H pattern at i, i+1, i+2, i+3, i+4
+            hth = h[i] * h[i + 1] * t[i + 2] * h[i + 3] * h[i + 4]
+            energy -= 0.3 * hth
 
-            # Negative energy = favorable (consistent SS)
-            energy -= 0.3 * max(helix_pair, strand_pair)
+        # --- Component 5: Penalize helix-strand transitions ---
+        # Direct helix→strand transitions are rare; usually need a turn/coil
+        for i in range(n - 1):
+            h_to_s = h[i] * s[i + 1]
+            s_to_h = s[i] * h[i + 1]
+            energy += 0.2 * (h_to_s + s_to_h)  # Penalty
 
         return energy

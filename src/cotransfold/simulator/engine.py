@@ -32,6 +32,7 @@ from cotransfold.energy.rg_restraint import RgRestraintEnergy
 from cotransfold.energy.torsion_coupling import TorsionCouplingEnergy
 from cotransfold.energy.pair_potential import PairPotentialEnergy
 from cotransfold.energy.sheet_pairing import SheetPairingEnergy
+from cotransfold.energy.backbone_dipole import BackboneDipoleEnergy
 from cotransfold.tunnel.geometry import TunnelGeometry
 from cotransfold.tunnel.electrostatics import TunnelElectrostatics
 from cotransfold.tunnel.organisms import get_tunnel
@@ -75,6 +76,7 @@ class SimulationConfig:
     w_torsion_coupling: float = 0.5
     w_pair_potential: float = 0.3
     w_sheet_pairing: float = 0.3
+    w_backbone_dipole: float = 0.8
 
     # Tunnel energy parameters
     tunnel_wall_spring: float = 5.0
@@ -154,6 +156,7 @@ class SimulationEngine:
         self._energy.add_term(TorsionCouplingEnergy(), cfg.w_torsion_coupling)
         self._energy.add_term(PairPotentialEnergy(), cfg.w_pair_potential)
         self._energy.add_term(SheetPairingEnergy(), cfg.w_sheet_pairing)
+        self._energy.add_term(BackboneDipoleEnergy(), cfg.w_backbone_dipole)
 
         # Chaperone program
         self._chaperone_program = None
@@ -172,6 +175,7 @@ class SimulationEngine:
             'tunnel': cfg.w_tunnel if cfg.use_tunnel else 0.0,
             'rg_restraint': cfg.w_rg,
             'torsion_coupling': cfg.w_torsion_coupling,
+            'backbone_dipole': cfg.w_backbone_dipole,
         }
         if self._use_jax:
             from cotransfold.minimizer.jax_minimizer import JaxMinimizer

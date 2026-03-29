@@ -23,25 +23,29 @@ from cotransfold.sampling.mc_moves import random_mc_move
 # Staged scoring weights (Rosetta-inspired)
 # Each stage is a dict of weight multipliers applied to the base weights
 SCORING_STAGES = [
-    {   # Stage 1: smooth landscape — only steric + solvation + Rg
+    {   # Stage 1: smooth landscape — steric + solvation + Rg + dipole
         'ramachandran': 0.0, 'hbond': 0.0, 'vanderwaals': 1.0,
         'solvent': 1.0, 'rg_restraint': 1.0, 'pair_potential': 0.5,
         'sheet_pairing': 0.0, 'torsion_coupling': 0.0, 'bonded': 0.5,
+        'backbone_dipole': 0.5,
     },
-    {   # Stage 2: add pair potential + sheet pairing
+    {   # Stage 2: add pair potential + sheet pairing + dipole
         'ramachandran': 0.0, 'hbond': 0.3, 'vanderwaals': 1.0,
         'solvent': 1.0, 'rg_restraint': 1.0, 'pair_potential': 1.0,
         'sheet_pairing': 0.5, 'torsion_coupling': 0.3, 'bonded': 0.5,
+        'backbone_dipole': 0.8,
     },
-    {   # Stage 3: add H-bonds
+    {   # Stage 3: add H-bonds + full dipole + torsion coupling
         'ramachandran': 0.2, 'hbond': 0.7, 'vanderwaals': 1.0,
         'solvent': 1.0, 'rg_restraint': 1.0, 'pair_potential': 1.0,
-        'sheet_pairing': 1.0, 'torsion_coupling': 0.5, 'bonded': 1.0,
+        'sheet_pairing': 1.0, 'torsion_coupling': 0.7, 'bonded': 1.0,
+        'backbone_dipole': 1.0,
     },
     {   # Stage 4: full energy
         'ramachandran': 1.0, 'hbond': 1.0, 'vanderwaals': 1.0,
         'solvent': 1.0, 'rg_restraint': 1.0, 'pair_potential': 1.0,
         'sheet_pairing': 1.0, 'torsion_coupling': 1.0, 'bonded': 1.0,
+        'backbone_dipole': 1.0,
     },
 ]
 
