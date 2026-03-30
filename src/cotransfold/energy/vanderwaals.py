@@ -28,6 +28,10 @@ BACKBONE_EPSILON = 0.10  # kcal/mol
 # Cβ-Cβ interaction parameters
 CB_EPSILON = 0.03   # kcal/mol, sidechain interaction strength
 
+# Soft-core parameters — caps repulsion to prevent infinite barriers
+REPULSION_CAP = 10.0   # Maximum repulsive energy per pair (kcal/mol)
+SOFT_CORE_DELTA = 0.5  # Å, soft-core shift to round off singularity
+
 
 class VanDerWaalsEnergy(EnergyTerm):
     """Lennard-Jones potential between backbone and sidechain atoms."""
@@ -54,7 +58,11 @@ class VanDerWaalsEnergy(EnergyTerm):
         return e_bb + e_cb
 
     def _compute_ca_only(self, coords: np.ndarray, n: int) -> float:
-        """CA-CA full Lennard-Jones potential (vectorized)."""
+        """Soft-core CA-CA Lennard-Jones potential (vectorized).
+
+        Uses r_eff = (r⁶ + δ⁶)^(1/6) to round off the r⁻¹² singularity,
+        and caps repulsion at REPULSION_CAP to prevent infinite barriers.
+        """
         ca = get_ca_coords(coords)  # (N, 3)
 
         # Pairwise distance matrix
@@ -68,10 +76,16 @@ class VanDerWaalsEnergy(EnergyTerm):
         if not np.any(mask):
             return 0.0
 
-        r = np.maximum(dist[mask], 0.1)
-        ratios = CA_SIGMA / r
-        # Full LJ: ε[(σ/r)¹² - 2(σ/r)⁶], minimum at r=σ with depth -ε
-        return float(np.sum(CA_EPSILON * (ratios ** 12 - 2.0 * ratios ** 6)))
+        # Soft-core effective distance: rounds off singularity at r→0
+        r_raw = dist[mask]
+        r_eff = (r_raw ** 6 + SOFT_CORE_DELTA ** 6) ** (1.0 / 6.0)
+        r_eff = np.maximum(r_eff, 0.1)
+
+        ratios = CA_SIGMA / r_eff
+        # Capped LJ: min(repulsive, cap) - attractive
+        repulsive = np.minimum(ratios ** 12, REPULSION_CAP / CA_EPSILON)
+        attractive = 2.0 * ratios ** 6
+        return float(np.sum(CA_EPSILON * (repulsive - attractive)))
 
     def _compute_cb_interactions(self, coords: np.ndarray, n: int,
                                  sequence: list) -> float:
@@ -97,10 +111,15 @@ class VanDerWaalsEnergy(EnergyTerm):
         if not np.any(mask):
             return 0.0
 
-        r = np.maximum(dist[mask], 0.1)
+        # Soft-core Cβ-Cβ LJ
+        r_raw = dist[mask]
+        r_eff = (r_raw ** 6 + SOFT_CORE_DELTA ** 6) ** (1.0 / 6.0)
+        r_eff = np.maximum(r_eff, 0.1)
         sig = sigma_ij[mask]
-        ratios = sig / r
-        return float(np.sum(CB_EPSILON * (ratios ** 12 - 2.0 * ratios ** 6)))
+        ratios = sig / r_eff
+        repulsive = np.minimum(ratios ** 12, REPULSION_CAP / max(CB_EPSILON, 1e-10))
+        attractive = 2.0 * ratios ** 6
+        return float(np.sum(CB_EPSILON * (repulsive - attractive)))
 
     def _compute_all_atoms(self, coords: np.ndarray, n: int) -> float:
         """All backbone atom repulsive potential (vectorized)."""

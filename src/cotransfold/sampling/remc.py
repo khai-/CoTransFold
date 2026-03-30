@@ -208,16 +208,17 @@ def run_remc(chain: NascentChain,
     best_energy = energies[0]
     best_backbone = replicas[0].copy()
 
-    for cycle in range(n_cycles):
-        # Determine current stage
-        stage_idx = 0
+    # Pre-compute stage index for each cycle
+    stage_for_cycle = np.zeros(n_cycles, dtype=int)
+    for c in range(n_cycles):
         for si, boundary in enumerate(stage_boundaries):
-            if cycle < boundary:
-                stage_idx = si
+            if c < boundary:
+                stage_for_cycle[c] = si
                 break
-        stage_mult = SCORING_STAGES[stage_idx]
 
-        # Move type: early stages use 9-mer, late stages use 3-mer
+    for cycle in range(n_cycles):
+        stage_idx = stage_for_cycle[cycle]
+        stage_mult = SCORING_STAGES[stage_idx]
         move_stage = 'early' if stage_idx < 2 else 'late'
 
         # Run independent MC on each replica
@@ -225,11 +226,11 @@ def run_remc(chain: NascentChain,
             T = temps[k]
 
             for _ in range(mc_steps_per_cycle):
+                # Save only the angles (avoid full copy)
                 old_phi = replicas[k].phi.copy()
                 old_psi = replicas[k].psi.copy()
-                old_energy = energies[k]
 
-                # Apply move
+                # Apply move directly to replica
                 chain.backbone.phi[:] = replicas[k].phi
                 chain.backbone.psi[:] = replicas[k].psi
                 chain.backbone.omega[:] = replicas[k].omega
@@ -243,9 +244,9 @@ def run_remc(chain: NascentChain,
                 new_energy = _compute_staged_energy(
                     energy_fn, chain, stage_mult, **energy_kwargs)
 
-                # Metropolis
-                delta_e = new_energy - old_energy
-                if delta_e < 0 or rng.random() < np.exp(-delta_e / max(T, 1e-10)):
+                # Metropolis criterion
+                delta_e = new_energy - energies[k]
+                if delta_e < 0 or rng.random() < np.exp(-min(delta_e / max(T, 1e-10), 500)):
                     energies[k] = new_energy
                 else:
                     replicas[k].phi[:] = old_phi

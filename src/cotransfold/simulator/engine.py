@@ -94,10 +94,10 @@ class SimulationConfig:
 
     # REMC sampling (replaces annealing + multi-start when enabled)
     use_remc: bool = True
-    remc_replicas: int = 12
-    remc_cycles: int = 150
+    remc_replicas: int = 20
+    remc_cycles: int = 300
     remc_mc_steps: int = 0       # 0 = auto-scale by sqrt(N)
-    remc_independent_runs: int = 2
+    remc_independent_runs: int = 3
     remc_t_low: float = 0.5
     remc_t_high: float = 5.0
 

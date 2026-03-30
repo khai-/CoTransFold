@@ -49,15 +49,15 @@ def _ss_membership(phi, psi):
     """
     # Helix membership
     d_h = (_angle_diff(phi, HELIX_PHI) ** 2 + _angle_diff(psi, HELIX_PSI) ** 2)
-    helix = np.exp(-d_h / (2 * np.radians(20) ** 2))
+    helix = np.exp(-d_h / (2 * np.radians(30) ** 2))
 
-    # Strand membership
+    # Strand membership — wider basin for MC acceptance
     d_s = (_angle_diff(phi, STRAND_PHI) ** 2 + _angle_diff(psi, STRAND_PSI) ** 2)
-    strand = np.exp(-d_s / (2 * np.radians(25) ** 2))
+    strand = np.exp(-d_s / (2 * np.radians(35) ** 2))
 
     # Turn membership (type I turn, position i+1)
     d_t = (_angle_diff(phi, TURN_PHI_1) ** 2 + _angle_diff(psi, TURN_PSI_1) ** 2)
-    turn = np.exp(-d_t / (2 * np.radians(25) ** 2))
+    turn = np.exp(-d_t / (2 * np.radians(35) ** 2))
 
     return helix, strand, turn
 

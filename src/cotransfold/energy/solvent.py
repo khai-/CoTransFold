@@ -56,7 +56,7 @@ CONTACT_R0 = 6.0        # Å, direct contact distance (Cβ-Cβ)
 BARRIER_WIDTH = 1.5      # Å, width of desolvation barrier
 WATER_SHELL = 3.0        # Å, water molecule diameter
 CONTACT_DEPTH = 1.0      # kcal/mol, contact well depth (scaled by hydrophobicity)
-BARRIER_HEIGHT = 0.33    # fraction of contact depth (ε'' = 0.33ε)
+BARRIER_HEIGHT = 0.20    # fraction of contact depth (softened for MC sampling)
 WATER_DEPTH = 0.33       # fraction of contact depth (ε' = 0.33ε)
 MIN_SEQ_SEP = 3
 
