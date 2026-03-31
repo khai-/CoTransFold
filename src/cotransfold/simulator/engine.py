@@ -39,6 +39,7 @@ from cotransfold.tunnel.organisms import get_tunnel
 from cotransfold.kinetics.translation import TranslationSchedule
 from cotransfold.sampling.fragments import FragmentLibrary
 from cotransfold.sampling.remc import run_remc
+from cotransfold.dynamics.langevin import run_langevin, run_annealed_langevin, LangevinConfig
 from cotransfold.chaperones.program import ChaperoneProgram
 from cotransfold.minimizer.gradient import GradientMinimizer
 from cotransfold.structure.coordinates import torsion_to_cartesian
@@ -101,7 +102,14 @@ class SimulationConfig:
     remc_t_low: float = 0.5
     remc_t_high: float = 5.0
 
-    # Minimizer parameters
+    # Dynamics mode
+    use_langevin: bool = True           # Use Langevin dynamics instead of L-BFGS-B
+    langevin_steps_per_residue: int = 100  # Dynamics steps per translation step
+    langevin_post_steps: int = 3000     # Post-translation annealed dynamics steps
+    langevin_t_start: float = 2.0       # Annealing start temperature factor
+    langevin_t_end: float = 0.3         # Annealing end temperature factor
+
+    # Minimizer parameters (used when use_langevin=False)
     minimizer: str = 'numpy'            # 'jax' (autodiff) or 'numpy' (finite differences)
     minimizer_ftol: float = 1e-7
     minimizer_gtol: float = 1e-5
@@ -243,6 +251,9 @@ class SimulationEngine:
 
         tunnel_length = self._tunnel_geom.length if self._tunnel_geom else 90.0
 
+        # Sequence hash for reproducible RNG seeding
+        seq_hash = hash(tuple(aa_seq)) % (2**31)
+
         # === Main simulation loop ===
         for i in range(n):
             aa = aa_seq[i]
@@ -296,13 +307,26 @@ class SimulationEngine:
                 chaperone_energy = self._chaperone_program.get_total_energy_modifier(
                     chaperone_actions)
 
-            # 6. Energy minimization
+            # 6. Folding dynamics / energy minimization
             energy_kwargs = {}
             if cfg.use_tunnel:
                 energy_kwargs['tunnel_positions'] = chain.tunnel_position
                 energy_kwargs['tunnel_length'] = tunnel_length
 
-            if self._use_jax:
+            if cfg.use_langevin:
+                # Langevin dynamics: physically faithful folding
+                lang_steps = max(cfg.langevin_steps_per_residue,
+                                 int(n_steps * 0.5))
+                run_langevin(
+                    chain, self._energy, frozen_mask,
+                    n_steps=lang_steps,
+                    energy_kwargs=energy_kwargs,
+                    rng=np.random.RandomState(seq_hash + i),
+                )
+                # Minimal result placeholder
+                from cotransfold.minimizer.gradient import MinimizationResult
+                result = MinimizationResult(0.0, 0.0, lang_steps, True, "langevin")
+            elif self._use_jax:
                 jax_kwargs = dict(energy_kwargs)
                 jax_kwargs.pop('tunnel_length', None)
                 result = self._jax_minimizer.minimize(
@@ -391,8 +415,23 @@ class SimulationEngine:
             seq_seed = hash(tuple(aa_seq)) % (2**31)
             np.random.seed(seq_seed)
 
-            # --- REMC sampling (preferred over SA + multi-start) ---
-            if cfg.use_remc:
+            # --- Langevin dynamics post-translation (most physical) ---
+            if cfg.use_langevin:
+                rng = np.random.RandomState(seq_seed)
+                run_annealed_langevin(
+                    chain, self._energy, free_mask,
+                    n_steps=cfg.langevin_post_steps,
+                    t_start=cfg.langevin_t_start,
+                    t_end=cfg.langevin_t_end,
+                    n_stages=5,
+                    energy_kwargs=eq_kwargs,
+                    rng=rng,
+                )
+                # Final gradient minimization to polish
+                _minimize_eq(cfg.equilibration_steps // 4)
+
+            # --- REMC sampling (when Langevin disabled) ---
+            elif cfg.use_remc:
                 frag_lib = FragmentLibrary(aa_seq, n_frags=200, seed=seq_seed)
 
                 # Auto-scale MC steps by chain length
