@@ -122,7 +122,7 @@ class HydrogenBondEnergy(EnergyTerm):
         mask = (jj >= ii + MIN_SEPARATION)  # sequence separation
         mask &= (ii < n - 1)               # acceptor valid (has next N for O placement)
         mask &= (jj > 0)                   # donor valid (not first residue)
-        mask &= (r_on < MAX_NO_DISTANCE)   # distance cutoff
+        mask &= (r_on > 2.0) & (r_on < MAX_NO_DISTANCE)  # physical lower bound + cutoff
 
         if not np.any(mask):
             return 0.0
@@ -143,8 +143,11 @@ class HydrogenBondEnergy(EnergyTerm):
                           (1.0 / r_on_valid[safe] + 1.0 / r_ch[safe]
                            - 1.0 / r_oh[safe] - 1.0 / r_cn[safe]))
 
-        # Only count attractive (negative) energies
-        energies = np.minimum(energies, 0.0)
+        # Only count attractive (negative) energies, clamped to physical floor.
+        # A strong backbone H-bond is ~-3 kcal/mol; -5 is a generous cap that
+        # prevents unphysical -10^3 contributions when the Kabsch-Sander 1/r
+        # terms diverge at short range.
+        energies = np.clip(energies, -5.0, 0.0)
 
         # Cooperative enhancement: consecutive helical H-bonds (i→i+4)
         # are up to 2x stronger than isolated ones

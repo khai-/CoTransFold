@@ -79,7 +79,10 @@ class BackboneDipoleEnergy(EnergyTerm):
         if not np.any(mask):
             return 0.0
 
-        r = np.maximum(dist, 0.1)
+        # Floor r at 3 Å: the point-dipole approximation is only valid when
+        # r >> dipole length (~1.4 Å). Below 3 Å the 1/r³ formula diverges
+        # and produces unphysical -10^4 energies in crumpled states.
+        r = np.maximum(dist, 3.0)
         r_hat = diff / (r[:, :, None] + 1e-10)  # unit separation vectors
 
         # Dot products for dipole formula
@@ -95,5 +98,8 @@ class BackboneDipoleEnergy(EnergyTerm):
         prefactor = PARTIAL_CHARGE ** 2 * COULOMB_KCAL * CHARGE_SEP ** 2 / DIELECTRIC
 
         e_dd = prefactor * (mu_dot - 3.0 * mu1_r * mu2_r) / (r ** 3)
+        # Clamp per-pair to physical range. An optimally aligned pair at
+        # contact distance is ~-1 kcal/mol; ±2 is a generous cap.
+        e_dd = np.clip(e_dd, -2.0, 2.0)
 
         return float(np.sum(e_dd[mask]))

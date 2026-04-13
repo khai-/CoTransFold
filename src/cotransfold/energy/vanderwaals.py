@@ -82,10 +82,14 @@ class VanDerWaalsEnergy(EnergyTerm):
         r_eff = np.maximum(r_eff, 0.1)
 
         ratios = CA_SIGMA / r_eff
-        # Capped LJ: min(repulsive, cap) - attractive
+        # Capped LJ: min(repulsive, cap) - attractive, floored at -1 per pair.
+        # The physical LJ well depth is exactly -ε; without clamping the
+        # attractive term the soft-core r_eff floor of 0.5Å lets (σ/r_eff)^6
+        # explode, producing unphysical -10^5 energies for crumpled structures.
         repulsive = np.minimum(ratios ** 12, REPULSION_CAP / CA_EPSILON)
         attractive = 2.0 * ratios ** 6
-        return float(np.sum(CA_EPSILON * (repulsive - attractive)))
+        lj = np.maximum(repulsive - attractive, -1.0)
+        return float(np.sum(CA_EPSILON * lj))
 
     def _compute_cb_interactions(self, coords: np.ndarray, n: int,
                                  sequence: list) -> float:
@@ -119,7 +123,8 @@ class VanDerWaalsEnergy(EnergyTerm):
         ratios = sig / r_eff
         repulsive = np.minimum(ratios ** 12, REPULSION_CAP / max(CB_EPSILON, 1e-10))
         attractive = 2.0 * ratios ** 6
-        return float(np.sum(CB_EPSILON * (repulsive - attractive)))
+        lj = np.maximum(repulsive - attractive, -1.0)
+        return float(np.sum(CB_EPSILON * lj))
 
     def _compute_all_atoms(self, coords: np.ndarray, n: int) -> float:
         """All backbone atom repulsive potential (vectorized)."""

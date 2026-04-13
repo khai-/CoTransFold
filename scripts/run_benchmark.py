@@ -34,6 +34,8 @@ def main() -> None:
                         help='Label for saving results (e.g., v0.1.0)')
     parser.add_argument('--no-tunnel', action='store_true')
     parser.add_argument('--no-chaperones', action='store_true')
+    parser.add_argument('--no-langevin', action='store_true',
+                        help='Use REMC sampling instead of Langevin dynamics')
     parser.add_argument('--minimizer', default='numpy',
                         choices=['numpy', 'fast', 'jax'],
                         help='Minimizer backend (default: numpy)')
@@ -59,6 +61,7 @@ def main() -> None:
         use_kinetics=False,
         use_tunnel=not args.no_tunnel,
         use_chaperones=not args.no_chaperones,
+        use_langevin=not args.no_langevin,
         minimizer=args.minimizer,
     )
 
