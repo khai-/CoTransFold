@@ -37,18 +37,30 @@ MIN_SEPARATION = 3       # Minimum sequence separation for H-bond (exclude i, i+
 HBOND_CUTOFF = -0.5  # kcal/mol
 
 
-def _place_h_atoms_batch(n_atoms: np.ndarray, ca_atoms: np.ndarray) -> np.ndarray:
-    """Place virtual H atoms for all residues at once.
+def _place_h_atoms_batch(n_atoms: np.ndarray, ca_atoms: np.ndarray,
+                         c_atoms: np.ndarray) -> np.ndarray:
+    """Place virtual H atoms using trigonal planar geometry.
 
-    H is placed opposite to CA relative to N, 1.0Å from N.
+    The amide N has three bonds (to H, CA, and C of previous residue).
+    The trigonal planar geometry constrains H to be anti to the bisector
+    of (N→CA) and (N→C_prev), not just anti to CA. The previous version
+    used (N - CA) only, which biases H placement by 30-60° and causes
+    systematic under-detection of real H-bonds in native structures.
+
     Returns shape (N, 3). h_atoms[0] is invalid (N-terminus).
     """
-    ca_n = n_atoms - ca_atoms  # (N, 3)
-    norms = np.linalg.norm(ca_n, axis=1, keepdims=True)
-    norms = np.maximum(norms, 1e-10)
-    ca_n_norm = ca_n / norms
-    h_atoms = n_atoms + BOND_LENGTH_NH * ca_n_norm
-    h_atoms[0] = 0.0  # Invalid for first residue
+    n = len(n_atoms)
+    h_atoms = np.zeros((n, 3))
+    if n < 2:
+        return h_atoms
+
+    # For residues 1..N-1: H direction is anti to (CA + C_prev) from N
+    n_minus_ca = n_atoms[1:] - ca_atoms[1:]       # (N-1, 3)
+    n_minus_cprev = n_atoms[1:] - c_atoms[:-1]    # (N-1, 3)
+    h_dir = n_minus_ca + n_minus_cprev
+    h_norm = np.linalg.norm(h_dir, axis=1, keepdims=True)
+    h_norm = np.maximum(h_norm, 1e-10)
+    h_atoms[1:] = n_atoms[1:] + BOND_LENGTH_NH * h_dir / h_norm
     return h_atoms
 
 
@@ -104,7 +116,7 @@ class HydrogenBondEnergy(EnergyTerm):
         ca_atoms = coords[:, 1]  # (N, 3)
         c_atoms = coords[:, 2]   # (N, 3)
 
-        h_atoms = _place_h_atoms_batch(n_atoms, ca_atoms)
+        h_atoms = _place_h_atoms_batch(n_atoms, ca_atoms, c_atoms)
         o_atoms = _place_o_atoms_batch(c_atoms, ca_atoms, n_atoms)
 
         # Build pairwise distance matrices for O(i) vs N(j)
@@ -143,38 +155,44 @@ class HydrogenBondEnergy(EnergyTerm):
                           (1.0 / r_on_valid[safe] + 1.0 / r_ch[safe]
                            - 1.0 / r_oh[safe] - 1.0 / r_cn[safe]))
 
-        # Only count attractive (negative) energies, clamped to physical floor.
-        # A strong backbone H-bond is ~-3 kcal/mol; -5 is a generous cap that
-        # prevents unphysical -10^3 contributions when the Kabsch-Sander 1/r
-        # terms diverge at short range.
-        energies = np.clip(energies, -5.0, 0.0)
+        # Clamp per-pair to physical range. A real backbone H-bond is ~-2 to
+        # -3 kcal/mol; capping at -3 prevents the simulation from over-rewarding
+        # geometrically perfect packing where multiple "H-bonds" pile up at the
+        # same residue. The previous -5 cap allowed runaway minima.
+        energies = np.clip(energies, -3.0, 0.0)
 
-        # Cooperative enhancement: consecutive helical H-bonds (i→i+4)
-        # are up to 2x stronger than isolated ones
-        is_helical = (don_idx - acc_idx == 4)
-        has_helical_hbond = np.zeros(n, dtype=bool)
+        # Enforce physical exclusivity: each backbone N-H can donate to only
+        # ONE H-bond and each C=O can accept only ONE. Without this, tightly
+        # packed structures over-count H-bonds and the energy function develops
+        # a spurious global minimum where the chain collapses into an
+        # artificially H-bond-saturated bundle.
+        # For each donor, keep only its strongest (most negative) H-bond.
+        # Then for each acceptor, keep only its strongest among the survivors.
+        best_per_donor = {}
         for k in range(len(acc_idx)):
-            if is_helical[k] and energies[k] < HBOND_CUTOFF:
-                has_helical_hbond[acc_idx[k]] = True
-
-        for k in range(len(acc_idx)):
-            if not is_helical[k] or energies[k] >= 0:
+            if energies[k] >= 0:
                 continue
-            # Count consecutive helical H-bonds around this acceptor
-            pos = acc_idx[k]
-            n_consec = 0
-            for offset in range(1, 4):
-                if pos - offset >= 0 and has_helical_hbond[pos - offset]:
-                    n_consec += 1
-                else:
-                    break
-            for offset in range(1, 4):
-                if pos + offset < n and has_helical_hbond[pos + offset]:
-                    n_consec += 1
-                else:
-                    break
-            # Enhancement: 1.0 (isolated) to 2.0 (in long helix)
-            coop_factor = 1.0 + min(n_consec, 5) * 0.2
-            energies[k] *= coop_factor
+            d = int(don_idx[k])
+            if d not in best_per_donor or energies[k] < energies[best_per_donor[d]]:
+                best_per_donor[d] = k
+        keep_donor = set(best_per_donor.values())
+
+        best_per_acceptor = {}
+        for k in keep_donor:
+            a = int(acc_idx[k])
+            if a not in best_per_acceptor or energies[k] < energies[best_per_acceptor[a]]:
+                best_per_acceptor[a] = k
+        keep = set(best_per_acceptor.values())
+
+        kept_mask = np.zeros(len(acc_idx), dtype=bool)
+        for k in keep:
+            kept_mask[k] = True
+        energies = np.where(kept_mask, energies, 0.0)
+
+        # No cooperativity bonus — it amplifies the runaway minimum where
+        # the sim packs every residue into maximum H-bond geometry. With
+        # cooperativity, long uniform H-bond stretches got up to 1.5x bonus,
+        # which combined with the per-pair cap allowed the simulation to find
+        # spurious global minima with ~2x the H-bond energy of native folds.
 
         return float(np.sum(energies))
